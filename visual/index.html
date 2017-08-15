@@ -1,0 +1,298 @@
+<!-- Copyright 2017, Yahoo Holdings Inc. -->
+<!-- Licensed under the terms of the Apache license. See LICENSE file in project root for terms. -->
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="js/cytoscape.js"></script>
+        <script src="js/dagre.min.js"></script>
+        <script src="js/cytoscape-dagre.js"></script>
+
+        <link href="css/style.css" rel="stylesheet" /> 
+        <meta name="viewport" content="user-scalable=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, minimal-ui"> 
+    </head>
+
+    <title>BFTKV-Visual</title>
+    
+    <body>
+        <h1> Visual Representation of the Byzantine Fault Tolerant Key-Value Server </h1>
+        <div id="interface">
+            <input type="text" id="readKey" placeholder="Key">
+            <!-- <input type="text" id="readAPIServerAddress" placeholder="API Server Address"> -->
+            <button class="button greenBG" id="readButton">Read</button> 
+            <input type="checkbox" id="isWriteMal" onclick="changeWriteType()"> 
+            <input type="text" id="writeKey" placeholder="Key">
+            <input type="text" id="writeValue" placeholder="Value">
+            <!-- <input type="text" id="writeAPIServerAddress" placeholder="API Server Address"> -->
+            <button class="button orangeBG" id="writeButton">Write</button> 
+            <button class="button yellowBG" id="signButton">Sign</button> 
+            <button class="button redBG" id="revokedButton">Revoked</button> 
+            <button class="button magentaBG" id="nodeGraphButton">Node Graph Edges</button> 
+            <button class="button pinkBG" id="inaccessibleButton">Inaccessible</button> 
+            <select id="servers" onchange="updateGraphServer()"></select>
+            &nbsp;
+            <h3 id="response" style="visibility:hidden;">Log</h3>
+        </div>
+
+        <div id="graph"> </div>
+        <script src="js/displayGraph.js"></script>
+    </body>
+    
+    <script>
+        var writeType = "write";
+        function changeWriteType() {
+            var writeButton = document.getElementById("writeButton");
+            var cb = document.getElementById("isWriteMal");
+            if (cb.checked) {
+                writeType = "writemal"; 
+                writeButton.innerText = "WriteMal";
+                writeButton.style.backgroundColor = "red";
+            } else {
+                writeType = "write"; 
+                writeButton.innerText = "Write";
+                writeButton.style.backgroundColor = "orange";
+            }
+        }
+
+    </script>
+    <script>
+        var NUM_SERVERS = 30;
+        var PORT_START = 5001;
+        var serverSelect = document.getElementById("servers");
+
+        for (var i = 0; i < NUM_SERVERS; i++) {
+            var currPort = (PORT_START + i);
+            serverSelect.innerHTML += '<option value="' + currPort + '">' + currPort + '</option>';
+        }
+        
+        function updateGraphServer() {
+            document.cookie = "server=" + serverSelect.value;
+            var socket = getSocketFromURL("ws://localhost:" + serverSelect.value + "/" + serverSelect.value);
+            socket.send(JSON.stringify({message: "graph"}))
+        }
+
+
+        var names = null;
+        var edges = null;
+        var revoked = [];
+        var socketMap = {};
+        var sockets = []
+        var inaccessible = [];
+        var colorNodeQ = [];
+        for (var i = 0; i < NUM_SERVERS; i++) {
+            var currPort = (PORT_START + i);
+            var ws = new WebSocket("ws://localhost:" + currPort + "/" + currPort);
+            sockets[i] = ws; 
+            sockets[i].onopen = function () {
+                console.log("Socket opened to " + this.url);
+                var graphServer = getGraphServerCookie();
+                if (graphServer == "") {
+                    graphServer = "5001"; 
+                }
+                serverSelect.value = graphServer;
+                if (this.url.toString().indexOf(graphServer) != -1) {
+                    this.send(JSON.stringify({message: "graph"}))
+                }
+            }
+
+            sockets[i].onerror = function(event){
+                setTimeout(colorInaccessible, interval + 2000);
+            }
+
+            sockets[i].onmessage = function (evt) {
+                console.log("Data received from " + this.url);
+                var data = evt.data;
+                console.log("Data: ");
+                console.log(data);
+                data = JSON.parse(data)
+                if (typeof data.Names != "undefined" && typeof data.Edges != "undefined") { // valid graph 
+                    names = data.Names;
+                    edges = data.Edges;
+                    if (data.Revoked != null) {
+                        revoked = data.Revoked;
+                    }
+                    buildGraph(data);
+
+                    // add onclick events.
+                    cy.nodes().on("click", function (e) {
+                        var clicked = e.target;
+                        console.log("Clicked on the node with id: " + clicked.id())  
+                        var sock = socketMap[clicked.id()]
+                        if (typeof sock == "undefined") {
+                            console.log("Socket not connected.");
+                            return;
+                        }
+                        sock.send(JSON.stringify({message : "trustGraph"}))
+                    });
+                } else if (data.actionType == "read") {
+                    console.log("Read request to " + data.to);
+                    colorNodeQ.push({name: data.to, color: "green"})
+                } else if (data.actionType == "sign" || data.actionType == "malsign") { 
+                    console.log("Sign request to " + data.to); 
+                    colorNodeQ.push({name: data.to, color: "yellow"})
+                } else if (data.actionType == "write" || data.actionType == "malwrite") {
+                    console.log("Write request to " + data.to);
+                    colorNodeQ.push({name: data.to, color: "orange"})
+                } else if (data.actionType == "revoke") {
+                    console.log("Revoked node id: " + data.id)
+                    // color revoked node
+                    markRevoked([data.id])
+                    revoked.push(data.id)
+                } else if (data.actionType == "id") {
+                    console.log("Updating url of " + data.id + " to " + this.url);
+                    socketMap[data.id] = this;
+                    for (var i = 0; i < serverSelect.options.length; i++) {
+                        var option = serverSelect.options[i];
+                        if (this.url.indexOf(option) != -1) {
+                            option.value = names[data.id];
+                            option.text = names[data.id];
+                            break; 
+                        } 
+                    }
+
+                } else if (data.actionType == "trustGraph") {
+                    console.log("TRUST GRAPH RECEIVED.")
+                    // display the trust graph of the node on the current graph
+                    displayTrustGraphOfNode(data.graph)
+                } else {
+                    console.log("Unknown data type.")
+                }
+            }
+        }
+       
+        function getGraphServerCookie() {
+            var allCookies = document.cookie;
+            console.log("All cookies: " + allCookies);
+            var serverToBuildGraph = allCookies.substring(allCookies.indexOf('=') + 1);
+            console.log("Server to build graph: " + serverToBuildGraph);
+            return serverToBuildGraph;
+        }
+        
+        function getSocketFromURL(url) {
+            var nodeId = null;
+            for (var id in socketMap) {
+                if (socketMap[id].url == url) {
+                    nodeId = id;
+                    break;
+                }
+            }
+            return socketMap[nodeId];
+        }
+        function colorInaccessible() {
+            // change the color of the corresponding node to reflect that node is inaccessible
+            // since we don't know the id of the server (no socket connection yet), go over
+            // all the nodes in the graph and check for whether their ids are included in the
+            // socketMap that holds the ids sent from servers after the connection is established
+            var graphNodes = cy.nodes();
+            for (var i = 0; i < graphNodes.length; i++) {
+                var aNode = graphNodes[i];
+                var id = aNode.data().id;
+                if (typeof socketMap[id] == "undefined") {
+                    inaccessible.push(id);
+                    colorInaccessibleWithId(id);
+                }
+            }
+        }
+
+        function colorInaccessibleWithId(id) {
+            cy.filter("[id='" + id + "']").style({'background-color': '#DB7093'});
+        }
+
+        var coloredNodeCount = 0        
+        var interval = 3000;
+        var maxNodeColorCount = 50;
+
+        function changeNodeColor(nodeName, color) {
+            cy.filter('node[name="' + nodeName + '"]').style({'background-color': color})
+            nextInterval = interval - ((interval / maxNodeColorCount)* coloredNodeCount++)
+            if (nextInterval == interval) {
+                setTimeout(zeroColoredNodeCount, (maxNodeColorCount + 1) * (interval / maxNodeColorCount))
+            }
+            setTimeout(function () {
+                // revert back the color change
+                cy.filter('node[name="' + nodeName + '"]').style({'background-color': '#8E44AD'})
+                markRevoked(revoked);
+                colorInaccessible();
+            }, nextInterval);
+        }
+
+        function zeroColoredNodeCount() {
+            coloredNodeCount = 0;
+        }
+
+        function colorNodes() {
+            var toColor = colorNodeQ.shift(); // get first element in the queue.
+            if (typeof(toColor) != "undefined") {
+                changeNodeColor(toColor.name, toColor.color) 
+            }
+            setTimeout(colorNodes, interval / maxNodeColorCount);
+        }
+        
+        // start consuming the queue that holds node colors
+        colorNodes();
+
+        // displays the trust graph of a node on the current graph
+        function displayTrustGraphOfNode(graph) {
+            console.log("Displaying trust graph of node on current graph")
+            var edges = graph.Edges;
+            for (var i = 0; i < edges.length; i++) {
+                var edge = edges[i];
+                cy.filter("[id='" + edge.Source +  edge.Destination + "']").style({'line-color': 'magenta'});
+                console.log("Selecting edge with id: " + edge.Source + edge.Destination)
+            }
+            setTimeout(colorEdgesWithDefault, interval)
+        } 
+
+        function colorEdgesWithDefault() {
+                cy.filter().style({'line-color': '#104FEB'});
+        }
+    </script>
+
+
+    <script>
+        function httpGetAsync(theUrl, data) {
+            // make the response text hidden (still covers space) to prevent
+            // pointer drift on push down of graph by the response text
+            document.getElementById("response").style.visibility = "hidden"; 
+            
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.onreadystatechange = function() { 
+                if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+                    if (xmlHttp.responseText != "") {
+                        console.log("Read result: " + xmlHttp.responseText);
+                        document.getElementById("response").innerHTML = "Read result: " + xmlHttp.responseText;
+                        document.getElementById("response").style.visibility = "visible"; 
+                    }
+                } else if (xmlHttp.readyState == 4)  {
+                    console.log("Server response: " + xmlHttp.responseText);
+                    document.getElementById("response").innerHTML = xmlHttp.responseText;
+                    document.getElementById("response").style.visibility = "visible"; 
+                }
+            }
+            xmlHttp.open("POST", theUrl, true); // true for asynchronous 
+            if (data != "") {
+                xmlHttp.send(data);
+            } else {
+                xmlHttp.send();
+            }
+        }
+
+        document.getElementById("readButton").addEventListener("click", function(){
+            var apiAddr = "localhost:6001"; // document.getElementById("readAPIServerAddress").value; 
+            var key = document.getElementById("readKey").value; 
+            httpGetAsync("http://" + apiAddr + "/read/" + key, "");
+        });
+
+        document.getElementById("writeButton").addEventListener("click", function(){
+            console.log("Clicked on write button");
+            var apiAddr = "localhost:6002"; // document.getElementById("writeAPIServerAddress").value; 
+            if (writeType == "writemal") {
+                apiAddr = "localhost:6003"; 
+            }
+            var key = document.getElementById("writeKey").value; 
+            var value = document.getElementById("writeValue").value; 
+            httpGetAsync("http://" + apiAddr + "/" + writeType + "/" + key, value);
+        });
+    </script>
+
+</html>

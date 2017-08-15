@@ -1,0 +1,10 @@
+package: github.com/yahoo/bftkv
+import:
+- package: golang.org/x/crypto
+  subpackages:
+  - openpgp
+  - openpgp/packet
+- package: golang.org/x/net
+  subpackages:
+  - websocket
+

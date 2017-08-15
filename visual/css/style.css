@@ -1,0 +1,59 @@
+/* 
+ * Copyright 2017, Yahoo Holdings Inc.
+ * Licensed under the terms of the Apache license. See LICENSE file in project root for terms.
+ */
+
+#graph {
+    height: 80%;
+    width: 100%;
+    position: absolute;
+    left: 0;
+    top: 100;
+}
+
+.button {
+    border: none;
+    color: white;
+    padding: 10px 25px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+}
+
+.greenBG {
+    background-color: green;
+}
+
+
+.orangeBG {
+    background-color: orange;
+}
+
+.yellowBG {
+    background-color: yellow;
+}
+
+.redBG {
+    background-color: red;
+}
+
+.magentaBG {
+    background-color: magenta;
+}
+
+.pinkBG {
+    background-color: #DB7093;
+}
+
+input[type=text] {
+    width: 15%;
+    padding: 12px 30px;
+    margin: 8px 0;
+    box-sizing: border-box;
+    font-size: 15px;
+}
+
+input[type="checkbox"] {
+     font-size: 50px; 
+}
