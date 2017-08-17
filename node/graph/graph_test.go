@@ -18,7 +18,7 @@ import (
 
 const (
 	maxDistance = 3
-	keyPrefix = "gnupg.a"
+	keyPrefix = "gnupg."
 	scriptPath = "../../scripts"
 )
 

@@ -23,9 +23,9 @@ func init() {
 func TestManyWrites(t *testing.T) {
 	// prints average time of writes
 	wsPort := 7010
-	servers := runServers(t, &wsPort, "gnupg.a")
+	servers := runServers(t, &wsPort, "bftkv.a")
 	defer stopServers(servers)
-	c := newClient(scriptPath+"/gnupg.a01", wsPort)
+	c := newClient(scriptPath+"/bftkv.a01", wsPort)
 	c.Joining()
 	start := time.Now()
 	for n := 0; n < rounds; n++ {
@@ -41,9 +41,9 @@ func TestManyWrites(t *testing.T) {
 func TestManyReads(t *testing.T) {
 	// prints average time of reads
 	wsPort := 7020
-	servers := runServers(t, &wsPort, "gnupg.a")
+	servers := runServers(t, &wsPort, "bftkv.a")
 	defer stopServers(servers)
-	c := newClient(scriptPath+"/gnupg.a01", wsPort)
+	c := newClient(scriptPath+"/bftkv.a01", wsPort)
 	c.Joining()
 	err := c.Write([]byte("ghi"), []byte("jkl"))
 	if err != nil {
@@ -64,9 +64,9 @@ func TestConcurrentReads(t *testing.T) {
 	// concurrent reads by the same client to the same quorum for the same <x, t>
 	// no maximum - crashes when exceeding max # of open files
 	wsPort := 7030
-	servers := runServers(t, &wsPort, "gnupg.a")
+	servers := runServers(t, &wsPort, "bftkv.a")
 	stopServers(servers)
-	c := newClient(scriptPath+"/gnupg.a01", wsPort)
+	c := newClient(scriptPath+"/bftkv.a01", wsPort)
 	c.Joining()
 	err := c.Write([]byte("mno"), []byte("pqr"))
 	if err != nil {
@@ -89,7 +89,7 @@ func TestConcurrentReads(t *testing.T) {
 
 func startManyClients(c_paths []string, clients *[]*Client, wsPort int) {
 	for _, c_path := range c_paths {
-		c := newClient(scriptPath+"/gnupg."+c_path, wsPort)
+		c := newClient(scriptPath+"/bftkv."+c_path, wsPort)
 		c.Joining()
 		*clients = append(*clients, c)
 		wsPort += 1
@@ -100,10 +100,10 @@ func TestManyClientsConcurrentReads(t *testing.T) {
 	// concurrent reads by multiple different clients multiple times for the same value
 	// no maximum - crashes when exceeding max # of open files
 	wsPort := 7090
-	servers := runServers(t, &wsPort, "gnupg.a")
+	servers := runServers(t, &wsPort, "bftkv.a")
 	defer stopServers(servers)
 
-	c1 := newClient(scriptPath+"/gnupg.a01", wsPort)
+	c1 := newClient(scriptPath+"/bftkv.a01", wsPort)
 	c1.Joining()
 	clients := []*Client{c1}
 
@@ -139,7 +139,7 @@ func TestManyClientsConcurrentWrites(t *testing.T) {
 	// multiple different clients will write to different keys multiple times concurrently
 	// no maximum - crashes when exceeding max # of open files
 	wsPort := 7060
-	servers := runServers(t, &wsPort, "gnupg.a")
+	servers := runServers(t, &wsPort, "bftkv.a")
 	defer stopServers(servers)
 	var clients []*Client
 	startManyClients([]string{"a01", "a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09", "a10"}, &clients, 7061)

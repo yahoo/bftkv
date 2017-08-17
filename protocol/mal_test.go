@@ -33,7 +33,7 @@ func TestMaliciousCollusion(t *testing.T) {
 	wsPort := wsPortStart
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), serverKeyPrefix) {
-			s := newMalServer(scriptPath+"/"+f.Name(), dbPath+f.Name()[len(serverKeyPrefix):], wsPort)
+			s := newMalServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):], wsPort)
 			if err := s.Start(); err != nil {
 				t.Fatal(err)
 			}
@@ -81,8 +81,8 @@ func TestTOFU(t *testing.T) {
 	// exp: successful --- the client will write <x, t, v> for the first time
 	// exp: successful --- the client will wrtie <x, t', v'>
 	wsPort := 5040
-	servers := runServers(t, &wsPort, "gnupg.a")
-	c1 := newClient(scriptPath+"/gnupg.u1", wsPort)
+	servers := runServers(t, &wsPort, "bftkv.a")
+	c1 := newClient(scriptPath+"/bftkv.u01", wsPort)
 	c1.Joining()
 	c1.checkTofu(uts, t, &wsPort, "original write successful")
 	c1.checkTofu(uts, t, &wsPort, "self overwrite successful")
@@ -90,16 +90,16 @@ func TestTOFU(t *testing.T) {
 
 	// exp: successful bc > 2f + 1 of the same servers who signed for u1 will sign for u2
 	wsPort = 5050
-	servers = runServers(t, &wsPort, "gnupg.a")
-	c2 := newClient(scriptPath+"/gnupg.u2", wsPort)
+	servers = runServers(t, &wsPort, "bftkv.a")
+	c2 := newClient(scriptPath+"/bftkv.u02", wsPort)
 	c2.Joining()
 	c2.checkTofu(uts, t, &wsPort, "trusted entity overwrite successful")
 	stopServers(servers)
 
 	// exp: permission denied --- diff servers will sign for c01 than u1
 	wsPort = 5060
-	servers = runServers(t, &wsPort, "gnupg.b")
-	c3 := newClient(scriptPath+"/gnupg.c01", wsPort)
+	servers = runServers(t, &wsPort, "bftkv.a")
+	c3 := newClient(scriptPath+"/bftkv.u99", wsPort)
 	c3.Joining()
 	c3.checkTofu(uts, t, &wsPort, "untrusted entity overwrite successful - expected error")
 	stopServers(servers)
@@ -113,7 +113,7 @@ func runServers(t *testing.T, port *int, prefix string) []*Server {
 	var servers []*Server
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), prefix) {
-			s := newServer(scriptPath+"/"+f.Name(), dbPath+f.Name()[len(serverKeyPrefix):] /*port*/, 0)
+			s := newServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):] /*port*/, 0)
 			if err := s.Start(); err != nil {
 				t.Fatal(err)
 			}

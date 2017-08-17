@@ -24,10 +24,10 @@ import (
 )
 
 const (
-	scriptPath = "../scripts"	// any way to specify the absolute path?
-	serverKeyPrefix = "gnupg.a"
-	clientKey = "gnupg.u1"
-	dbPath = "../scripts/run/db."
+	scriptPath = "../scripts/run"	// any way to specify the absolute path?
+	serverKeyPrefix = "bftkv.a"
+	clientKey = "bftkv.u01"
+	dbPrefix = scriptPath + "/db."
 	wsPortStart = 5001
 	testKey = "test"
 	testValue = "test"
@@ -47,7 +47,7 @@ func TestServer(t *testing.T) {
 	wsPort := wsPortStart
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), serverKeyPrefix) {
-			s := newServer(scriptPath + "/" + f.Name(), dbPath + f.Name()[len(serverKeyPrefix):], wsPort)	// for now
+			s := newServer(scriptPath + "/" + f.Name(), dbPrefix + f.Name()[len(serverKeyPrefix):], wsPort)	// for now
 			if err := s.Start(); err != nil {
 				t.Fatal(err)
 			}

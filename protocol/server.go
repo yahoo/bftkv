@@ -168,7 +168,7 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 	if issuer == nil {
 		return nil, crypto.ErrCertificateNotFound
 	}
-	q := s.qs.GetQuorum(quorum.AUTH, issuer)
+	q := s.qs.GetQuorum(quorum.AUTH | quorum.CERT, issuer)
 	if !q.IsThreshold(s.crypt.Certificate.Signers(issuer)) {
 		return nil, bftkv.ErrInvalidQuorumCertificate
 	}
@@ -204,7 +204,7 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 			if prevIssuer.UId() != issuer.UId() {	// must be the same identity
 				return nil, bftkv.ErrPermissionDenied
 			}
-			q := s.qs.GetQuorum(quorum.AUTH, prevIssuer)
+			q := s.qs.GetQuorum(quorum.AUTH | quorum.CERT, prevIssuer)
 			if !q.IsThreshold(s.crypt.Certificate.Signers(issuer)) {	// enough signers from the quorum trusted by the prev one
 				return nil, bftkv.ErrPermissionDenied
 			}

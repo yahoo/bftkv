@@ -20,6 +20,8 @@ type wot struct {
 type qc struct {	// quarum clique
 	nodes []node.Node
 	f int
+	min int
+	threshold int
 	suff int
 }
 
@@ -35,17 +37,23 @@ func New(g *graph.Graph) quorum.QuorumSystem {
 	return &wot{g: g}
 }
 
-func newQC(nodes []node.Node, extra bool) *qc {
+func newQC(nodes []node.Node, rw int) *qc {
 	n := len(nodes)
 	if n == 0 {
 		return nil
 	}
-	if extra {
-		return &qc{nodes, 0, 0}
+	if rw == 0 {
+		return &qc{nodes, 0, 0, 0, 0}
 	}
 	f := (n - 1) / 3
 	if f >= 1 {
-		return &qc{nodes, f, f + (n - f) / 2 + 1}
+		min := 3 * f + 1
+		threshold := 2 * f + 1
+		suff := f + (n - f) / 2 + 1
+		if (rw & quorum.CERT) != 0 {
+			threshold = f + 1
+		}
+		return &qc{nodes, f, min, threshold, suff}
 	} else {
 		return nil
 	}
@@ -68,7 +76,7 @@ func complement(u []node.Node, c []qc, e []qc, extra bool) []qc {
 			nodes = append(nodes, n1)
 		}
 	}
-	if q := newQC(nodes, extra); q != nil {
+	if q := newQC(nodes, 0); q != nil {
 		e = append(e, *q)
 	}
 	return e
@@ -78,7 +86,7 @@ func (qs *wot) getQuorumFrom(rw int, s uint64) quorum.Quorum {
 	q := &wotq{}
 	cliques := qs.g.GetCliques(s, maxCliqueDistance)
 	for _, c := range cliques {
-		if qc := newQC(c, false); qc != nil {
+		if qc := newQC(c, rw); qc != nil {
 			q.qcs = append(q.qcs, *qc)
 		}
 	}
@@ -136,7 +144,7 @@ func (q *wotq) IsQuorum(nodes []node.Node) bool {
 		return false
 	}
 	for _, qc := range q.qcs {
-		if qc.f > 0 && len(intersection(nodes, qc.nodes)) < 3 * qc.f + 1 {
+		if qc.f > 0 && len(intersection(nodes, qc.nodes)) < qc.min {
 			return false
 		}
 	}
@@ -145,8 +153,11 @@ func (q *wotq) IsQuorum(nodes []node.Node) bool {
 
 func (q *wotq) IsThreshold(nodes []node.Node) bool {
 	// |nodes| >= 2f+1
+	if len(q.qcs) == 0 {
+		return false
+	}
 	for _, qc := range q.qcs {
-		if qc.f > 0 && len(intersection(nodes, qc.nodes)) < 2 * qc.f + 1 {
+		if qc.f > 0 && len(intersection(nodes, qc.nodes)) < qc.threshold {
 			return false
 		}
 	}

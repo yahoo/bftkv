@@ -11,6 +11,7 @@ const (
 	READ = 0x01
 	WRITE = 0x02
 	AUTH = 0x04
+	CERT = 0x08
 )
 
 type Quorum interface {
