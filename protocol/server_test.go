@@ -46,7 +46,7 @@ func TestServer(t *testing.T) {
 	var servers []*Server
 	wsPort := wsPortStart
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), serverKeyPrefix) {
+		if strings.HasPrefix(f.Name(), serverKeyPrefix) || strings.HasPrefix(f.Name(), "bftkv.r") {
 			s := newServer(scriptPath + "/" + f.Name(), dbPrefix + f.Name()[len(serverKeyPrefix):], wsPort)	// for now
 			if err := s.Start(); err != nil {
 				t.Fatal(err)

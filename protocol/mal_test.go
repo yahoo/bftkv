@@ -30,7 +30,7 @@ func TestMaliciousCollusion(t *testing.T) {
 
 	// create test servers
 	var servers []*MalServer
-	wsPort := wsPortStart
+	wsPort := 6000
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), serverKeyPrefix) {
 			s := newMalServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):], wsPort)
@@ -105,20 +105,22 @@ func TestTOFU(t *testing.T) {
 	stopServers(servers)
 }
 
-func runServers(t *testing.T, port *int, prefix string) []*Server {
+func runServers(t *testing.T, port *int, prefixes ...string) []*Server {
 	files, err := ioutil.ReadDir(scriptPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var servers []*Server
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), prefix) {
-			s := newServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):] /*port*/, 0)
-			if err := s.Start(); err != nil {
-				t.Fatal(err)
+	        for _, prefix := range prefixes {
+			if strings.HasPrefix(f.Name(), prefix) {
+				s := newServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):] /*port*/, 0)
+				if err := s.Start(); err != nil {
+					t.Fatal(err)
+				}
+				servers = append(servers, s)
+				*port += 1
 			}
-			servers = append(servers, s)
-			*port += 1
 		}
 	}
 
