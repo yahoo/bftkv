@@ -88,12 +88,12 @@ func TestTOFU(t *testing.T) {
 	c1.checkTofu(uts, t, &wsPort, "self overwrite successful")
 	stopServers(servers)
 
-	// exp: successful bc > 2f + 1 of the same servers who signed for u1 will sign for u2
+	// exp: permission denied --- diff user id
 	wsPort = 5050
 	servers = runServers(t, &wsPort, "bftkv.a")
 	c2 := newClient(scriptPath+"/bftkv.u02", wsPort)
 	c2.Joining()
-	c2.checkTofu(uts, t, &wsPort, "trusted entity overwrite successful")
+	c2.checkTofu(uts, t, &wsPort, "untrusted entity overwrite successful - expected error")
 	stopServers(servers)
 
 	// exp: permission denied --- diff servers will sign for c01 than u1

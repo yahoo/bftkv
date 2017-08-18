@@ -60,7 +60,7 @@ func TestManyReads(t *testing.T) {
 	fmt.Printf("Avg read: %.6f seconds\n", duration.Seconds()/float64(rounds))
 }
 
-func TestConcurrentReads(t *testing.T) {
+func TestManyClientsConcurrentReads(t *testing.T) {
 	// concurrent reads by different clients to the same quorum for the same <x, t>
 	wsPort := 7040
 	servers := runServers(t, &wsPort, "bftkv.a", "bftkv.r")
