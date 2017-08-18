@@ -31,7 +31,6 @@ JOBS=""
 for key in bftkv.{u*,rw*,a*}; do
     GPGHOME=`basename $key`
     if is_failure $GPGHOME; then continue; fi
-#    if [ ! -e  $GPGHOME ]; then echo "copying $key"; cp -pr $key .; fi
     DB=db.`expr $GPGHOME : '.*\.\(.*\)'`
     mkdir -p $DB
     $AOUT -home $GPGHOME -api localhost:$API_ADDR -ws $WS_ADDR -db $DB &
@@ -39,13 +38,6 @@ for key in bftkv.{u*,rw*,a*}; do
     API_ADDR=`expr $API_ADDR + 1`
     if [ $WS_ADDR -ne 0 ]; then WS_ADDR=`expr $WS_ADDR + 1`; fi
     i=`expr $i + 1`
-done
-
-# send the "joining" message to only user nodes
-API_ADDR=6001
-for _ in bftkv.u*; do
-    curl http://localhost:$API_ADDR/joining
-    API_ADDR=`expr $API_ADDR + 1`
 done
 
 trap "kill $JOBS; exit" SIGINT SIGTERM

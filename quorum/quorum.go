@@ -24,5 +24,4 @@ type Quorum interface {
 
 type QuorumSystem interface {
 	ChooseQuorum(rw int) Quorum
-	GetQuorum(rw int, s node.Node) Quorum
 }

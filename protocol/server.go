@@ -53,11 +53,7 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Stop() {
-	// leave from the network
-	pkt, err := s.self.SerializeSelf()
-	if err == nil {
-		s.tr.Multicast(transport.Leave, s.self.GetPeers(), pkt, nil)
-	}
+	s.Leaving()	// leave from the network
 	s.tr.Stop()
 }
 
@@ -74,7 +70,7 @@ func (s *Server) join(req []byte, peer node.Node) ([]byte, error) {
 
 	// @@ accept any certificate unless it's been revoked
 	nodes = s.self.AddPeers(nodes)
-	if err := s.crypt.Keyring.Register(nodes, false); err != nil {
+	if err := s.crypt.Keyring.Register(nodes, false, false); err != nil {
 		s.self.RemovePeers(nodes)	// to be consistent
 		return nil, err
 	}
@@ -163,15 +159,17 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 		return nil, bftkv.ErrMalformedRequest
 	}
 
-	// check the signature with the issuer
 	issuer := s.crypt.Signature.Issuer(sig)
 	if issuer == nil {
 		return nil, crypto.ErrCertificateNotFound
 	}
-	q := s.qs.GetQuorum(quorum.AUTH | quorum.CERT, issuer)
+	// check |Q ^ {signers}| > f
+	q := s.qs.ChooseQuorum(quorum.AUTH | quorum.CERT)
 	if !q.IsThreshold(s.crypt.Certificate.Signers(issuer)) {
 		return nil, bftkv.ErrInvalidQuorumCertificate
 	}
+
+	// check the signature with the issuer
 	tbs, err := packet.TBS(req)
 	if err != nil {
 		return nil, err
@@ -198,13 +196,13 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 		// check the TOFU policy -- check if the signers are same or the new signer is trusted by a quorum
 		prevIssuer := s.crypt.Signature.Issuer(rsig)
 		if prevIssuer == nil {
-			return nil, crypto.ErrCertificateNotFound	// shouldn't happen
+			return nil, crypto.ErrCertificateNotFound	// should not happen
 		}
 		if prevIssuer.Id() != issuer.Id() {	// a new public key
 			if prevIssuer.UId() != issuer.UId() {	// must be the same identity
 				return nil, bftkv.ErrPermissionDenied
 			}
-			q := s.qs.GetQuorum(quorum.AUTH | quorum.CERT, prevIssuer)
+			q := s.qs.ChooseQuorum(quorum.AUTH | quorum.CERT)
 			if !q.IsThreshold(s.crypt.Certificate.Signers(issuer)) {	// enough signers from the quorum trusted by the prev one
 				return nil, bftkv.ErrPermissionDenied
 			}
@@ -369,9 +367,6 @@ func (s *Server) Handler(cmd int, r io.Reader, w io.Writer) error {
 	var peers []node.Node
 	if peer == nil {
 		peers = s.crypt.Keyring.GetKeyring()	// this should work only when cmd == Join and the peer's cert had not been registered
-		if peers == nil {
-			return crypto.ErrCertificateNotFound
-		}
 	} else {
 		peers = []node.Node{peer}
 	}

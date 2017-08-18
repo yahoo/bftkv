@@ -99,7 +99,7 @@ func main() {
 	}
 
 	// start HTTP API
-	apiServer := &apiService{bftClient: bftClient, bftServer: bftServer, g: g}
+	apiServer := &apiService{bftClient: bftClient, g: g}
 	apiServer.Start(*apiAddressp)
 
 	// wait for a signal
@@ -131,7 +131,7 @@ func readCerts(g *graph.Graph, crypt *crypto.Crypto, path string, sec bool) {
 	} else {
 		g.AddNodes(certs)
 	}
-	crypt.Keyring.Register(certs, sec)
+	crypt.Keyring.Register(certs, sec, true)
 	f.Close()
 }
 
@@ -184,7 +184,6 @@ func writeRevocationList(g *graph.Graph, crypt *crypto.Crypto, path string) {
 
 type apiService struct {
 	bftClient *protocol.Client
-	bftServer *protocol.Server
 	g *graph.Graph
 	httpServer *http.Server
 }
@@ -217,7 +216,11 @@ func (s *apiService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a := strings.Split(path, "/")
 	switch a[1] {
 	case "read":
-		res, err = s.bftClient.Read([]byte(a[2]))
+		err = s.bftClient.Joining()
+		if err == nil {
+			res, err = s.bftClient.Read([]byte(a[2]))
+			s.bftClient.Leaving()
+		}
 	case "write":
 		body, err2 := ioutil.ReadAll(r.Body)
 		if err2 != nil {
@@ -225,9 +228,15 @@ func (s *apiService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		r.Body.Close()
-		err = s.bftClient.Write([]byte(a[2]), body)
+		err = s.bftClient.Joining()
+		if err == nil {
+			err = s.bftClient.Write([]byte(a[2]), body)
+			s.bftClient.Leaving()
+		}
 	case "joining":
-		err = s.bftServer.Joining()
+		err = s.bftClient.Joining()
+	case "leaving":
+		err = s.bftClient.Leaving()
 	case "show":
 		s.dump()
 	case "debug":

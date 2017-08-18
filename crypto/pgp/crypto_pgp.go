@@ -116,27 +116,26 @@ func (c *PGPCertificateInstance) Active() bool {
 type PGPKeyring struct {
 	keyring openpgp.EntityList
 	secring openpgp.EntityList
-	self *openpgp.Entity
+	self openpgp.EntityList
 }
 
 func NewKeyring() crypto.Keyring {
 	return &PGPKeyring{}
 }
 
-func (k *PGPKeyring) Register(nodes []node.Node, priv bool) error {
+func (k *PGPKeyring) Register(nodes []node.Node, priv bool, self bool) error {
 	if !priv {
 		k.Remove(nodes)	// replace only pub keys
 	}
 	for _, n := range nodes {
 		c := n.Instance().(*openpgp.Entity)
 		if priv {
-			if k.self == nil {
-				// @@ take the first one for now
-				k.self = c
-			}
 			k.secring = append(k.secring, c)
 		} else {
 			k.keyring = append(k.keyring, c)
+			if self {
+				k.self = append(k.self, c)
+			}
 		}
 	}
 	return nil
@@ -177,7 +176,10 @@ func (k *PGPKeyring) getKeyring() openpgp.EntityList {
 }
 
 func (k *PGPKeyring) getPrivateKey() *openpgp.Entity {
-	return k.self
+	if len(k.secring) == 0 {
+		return nil
+	}
+	return k.secring[0]
 }
 
 func (k *PGPKeyring) getCertById(id uint64) *openpgp.Entity {
@@ -195,11 +197,8 @@ func (k *PGPKeyring) getCertById(id uint64) *openpgp.Entity {
 	return nil
 }
 
-func (k *PGPKeyring) getSelfCertificate() *openpgp.Entity {
-	if k.self == nil {
-		return nil
-	}
-	return k.getCertById(k.self.PrimaryKey.KeyId)
+func (k *PGPKeyring) getSelfCertificate() openpgp.EntityList {
+	return k.self
 }
 
 //
@@ -301,14 +300,13 @@ func (s *PGPSignature) Sign(tbs []byte) (*packet.SignaturePacket, error) {
 		return nil, err
 	}
 	sig := w.Bytes()
-	var cert []byte
-	if self := s.keyring.getSelfCertificate(); self != nil {
-		var w bytes.Buffer
-		if err := self.Serialize(&w); err != nil {
+	var w2 bytes.Buffer
+	for _, self := range s.keyring.getSelfCertificate() {
+		if err := self.Serialize(&w2); err != nil {
 			return nil, err
 		}
-		cert = w.Bytes()
 	}
+	cert := w2.Bytes()
 	return &packet.SignaturePacket{
 		Type: packet.SignatureTypePGP,
 		Version: 0,
@@ -337,15 +335,19 @@ func (s *PGPSignature) Signers(sig *packet.SignaturePacket) []node.Node {
 	return nodes
 }
 
+func (s *PGPSignature) Certs(sig *packet.SignaturePacket) ([]node.Node, error) {
+	return s.cert.Parse(sig.Cert)
+}
+
 func (s *PGPSignature) Issuer(sig *packet.SignaturePacket) node.Node {
 	if sig.Cert == nil || len(sig.Cert) == 0 {
 		return nil
 	}
-	nodes, err := s.cert.Parse(sig.Cert)
+	nodes, err := s.Certs(sig)
 	if err != nil || len(nodes) == 0 {
 		return nil
 	}
-	return nodes[0]
+	return nodes[0]		// has to be the first one
 }
 
 
@@ -361,13 +363,17 @@ func NewMessage(keyring crypto.Keyring) crypto.Message {
 }
 
 func (msg *PGPMessage) Encrypt(peers []node.Node, plain []byte, nonce []byte) ([]byte, error) {
+	priv := msg.keyring.getPrivateKey()
+	if priv == nil {
+		return nil, crypto.ErrCertificateNotFound
+	}
 	var to []*openpgp.Entity
 	for _, peer := range peers {
 		to = append(to, peer.Instance().(*openpgp.Entity))
 	}
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
-	plainWriter, err := openpgp.Encrypt(w, to, msg.keyring.getPrivateKey(), &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
+	plainWriter, err := openpgp.Encrypt(w, to, priv, &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -378,12 +384,13 @@ func (msg *PGPMessage) Encrypt(peers []node.Node, plain []byte, nonce []byte) ([
 }
 
 func (msg *PGPMessage) EncryptStream(w io.Writer, peerId uint64, nonce []byte) (plainWriter io.WriteCloser, err error) {
+	priv := msg.keyring.getPrivateKey()
 	e := msg.keyring.getCertById(peerId)
-	if e == nil {
+	if priv == nil || e == nil {
 		return nil, crypto.ErrCertificateNotFound
 	}
 	to := []*openpgp.Entity{e}
-	return openpgp.Encrypt(w, to, msg.keyring.getPrivateKey(), &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
+	return openpgp.Encrypt(w, to, priv, &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
 }
 
 func (msg *PGPMessage) Decrypt(body io.Reader) (plain []byte, nonce []byte, peer node.Node, err error) {

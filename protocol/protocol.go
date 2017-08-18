@@ -43,7 +43,7 @@ func (p *Protocol) Joining() error {
 				nodes, err := p.crypt.Certificate.Parse(res.Data)
 				if err == nil {
 					nodes = p.self.AddPeers(nodes)
-					if p.crypt.Keyring.Register(nodes, false) != nil {
+					if p.crypt.Keyring.Register(nodes, false, false) != nil {
 						p.self.RemovePeers(nodes)
 					}
 				}
@@ -52,6 +52,14 @@ func (p *Protocol) Joining() error {
 		})
 	}
 	return nil
+}
+
+func (p *Protocol) Leaving() error {
+	pkt, err := p.self.SerializeSelf()
+	if err == nil {
+		p.tr.Multicast(transport.Leave, p.PeerNodes(p.self.GetPeers()), pkt, nil)
+	}
+	return err
 }
 
 func (p *Protocol) PeerNodes(nodes []node.Node) []node.Node {

@@ -18,8 +18,8 @@ import (
 
 const (
 	maxDistance = 3
-	keyPrefix = "gnupg."
-	scriptPath = "../../scripts"
+	keyPrefix = "bftkv."
+	scriptPath = "../../scripts/run"
 )
 
 type Keyring struct {

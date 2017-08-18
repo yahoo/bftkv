@@ -27,6 +27,7 @@ type qc struct {	// quarum clique
 
 type wotq struct {
 	qcs []qc
+	cert bool
 }
 
 func howmany(a, b int) int {
@@ -82,7 +83,7 @@ func complement(u []node.Node, c []qc, e []qc, extra bool) []qc {
 	return e
 }
 
-func (qs *wot) getQuorumFrom(rw int, s uint64) quorum.Quorum {
+func (qs *wot) getQuorumFrom(rw int, s uint64) *wotq {
 	q := &wotq{}
 	cliques := qs.g.GetCliques(s, maxCliqueDistance)
 	for _, c := range cliques {
@@ -104,23 +105,12 @@ func (qs *wot) getQuorumFrom(rw int, s uint64) quorum.Quorum {
 		}
 		q.qcs = qcs
 	}
+	q.cert = (rw & quorum.CERT) != 0
 	return q
 }
 
 func (qs *wot) ChooseQuorum(rw int) quorum.Quorum {
 	return qs.getQuorumFrom(rw, qs.g.GetSelfId())
-}
-
-func (qs *wot) GetQuorum(rw int, s node.Node) quorum.Quorum {
-	inGraph := qs.g.InGraph(s)
-	if !inGraph {
-		qs.g.AddNodes([]node.Node{s})
-	}
-	q := qs.getQuorumFrom(rw, s.Id())
-	if !inGraph {
-		qs.g.RemoveNodes([]node.Node{s})
-	}
-	return q
 }
 
 //
@@ -156,12 +146,21 @@ func (q *wotq) IsThreshold(nodes []node.Node) bool {
 	if len(q.qcs) == 0 {
 		return false
 	}
-	for _, qc := range q.qcs {
-		if qc.f > 0 && len(intersection(nodes, qc.nodes)) < qc.threshold {
-			return false
+	if q.cert {
+		for _, qc := range q.qcs {
+			if qc.f > 0 && len(intersection(nodes, qc.nodes)) >= qc.threshold {
+				return true
+			}
 		}
+		return false
+	} else {
+		for _, qc := range q.qcs {
+			if qc.f > 0 && len(intersection(nodes, qc.nodes)) < qc.threshold {
+				return false
+			}
+		}
+		return true
 	}
-	return true
 }
 
 func (q *wotq) IsSufficient(nodes []node.Node) bool {

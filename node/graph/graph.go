@@ -114,10 +114,7 @@ func (g *Graph) GetPeers() []node.Node {
 }
 
 func (g *Graph) RemovePeers(peers []node.Node) {
-	// do not remove the nodes from the graph
-	for _, n := range peers {
-		n.SetActive(false)
-	}
+	g.RemoveNodes(peers)
 }
 
 func (g *Graph) Revoke(n node.Node) {

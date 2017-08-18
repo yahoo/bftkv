@@ -20,7 +20,7 @@ var (
 )
 
 type Keyring interface {
-	Register(nodes []node.Node, priv bool) error
+	Register(nodes []node.Node, priv bool, self bool) error
 	Remove(node []node.Node)
 	GetCertById(id uint64) node.Node
 	GetKeyring() []node.Node
@@ -39,6 +39,7 @@ type Signature interface {
 	Sign(tbs []byte) (*packet.SignaturePacket, error)
 	Signers(sig *packet.SignaturePacket) []node.Node		// return only nodes that have been verified
 	Issuer(sig *packet.SignaturePacket) node.Node
+	Certs(sig *packet.SignaturePacket) ([]node.Node, error)
 }
 
 type Message interface {
