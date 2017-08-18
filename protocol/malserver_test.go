@@ -6,7 +6,7 @@ package protocol
 import (
 	"io"
 	"log"
-	_ "net/url"
+	"net/url"
 	"strings"
 
 	"github.com/yahoo/bftkv"
@@ -40,6 +40,19 @@ func NewMalServer(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Trans
 	}
 }
 
+func (s *MalServer) Start() error {
+	// start the server first
+	if addr := s.self.Address(); addr != "" {
+		if u, err := url.Parse(addr); err == nil {
+			addr = ":" + u.Port()
+		}
+		s.tr.Start(s, addr)
+		log.Printf("Server @ %s running\n", addr)
+	}
+
+	return s.Joining()
+}
+
 func (s *MalServer) signResult(req []byte, peer node.Node) ([]byte, error) {
 	for _, url := range mal {
 		if strings.Compare(s.self.Address(), url) == 0 {
@@ -50,19 +63,21 @@ func (s *MalServer) signResult(req []byte, peer node.Node) ([]byte, error) {
 }
 
 func (s *MalServer) malSign(req []byte, peer node.Node) ([]byte, error) {
-	_, _, sig, _, _, err := packet.Parse(req)
+	_, _, _, _, _, err := packet.Parse(req)
 	if err != nil {
 		return nil, err
 	}
 
-	tv, err := packet.TBS(req)
+	tbss, err := packet.TBSS(req)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.crypt.Signature.Verify(tv, sig); err != nil {
-		return nil, err
-	}
-	ss, err := s.crypt.CollectiveSignature.Sign(req)
+	/*
+		if err := s.crypt.Signature.Verify(tv, sig); err != nil {
+			return nil, err
+		}
+	*/
+	ss, err := s.crypt.CollectiveSignature.Sign(tbss)
 	if err != nil {
 		return nil, err
 	}
