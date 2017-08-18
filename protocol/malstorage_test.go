@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,19 +23,22 @@ type MalStorage interface {
 }
 
 type malPlain struct {
-	path string
+	path  string
+	mutex sync.Mutex
 	plain storage.Storage
 }
 
 func MalStorageNew(path string) MalStorage {
 	return &malPlain{
-		path: path,
+		path:  path,
 		plain: storage_plain.New(path),
 	}
 }
 
 func (p *malPlain) getMalMaxT(fname string) (uint64, error) {
-	stats, err := ioutil.ReadDir(p.path + "/mal")
+	p.mutex.Lock()
+	stats, err := ioutil.ReadDir(p.path)
+	p.mutex.Unlock()
 	if err != nil {
 		return 0, err
 	}

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/yahoo/bftkv"
-	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/node/graph"
 	"github.com/yahoo/bftkv/packet"
@@ -35,7 +34,7 @@ func getCliques(g *graph.Graph) [][]node.Node {
 		if n == 0 {
 			continue
 		}
-		if (n - 1) / 3 >= 1 {
+		if (n-1)/3 >= 1 {
 			nodes = append(nodes, clique)
 		}
 	}
@@ -75,15 +74,14 @@ func (c *Client) getNodeGroup() nodeGroup {
 
 func (c *Client) WriteMal(variable []byte, value []byte) error {
 	// writes two different values for the same variable at the same time to colluding servers
-	mal = []string{"http://localhost:5705", "http://localhost:5702", "http://localhost:5703", "http://localhost:5706", "http://localhost:5707"}
+	// note colluding servers (mal) defined in mal_test.go
 	quorum := c.qs.ChooseQuorum(quorum.AUTH)
 	maxt := uint64(0)
-	var actives []node.Node
-
 	group := c.getNodeGroup()
 	group_a := append(group.honest1, group.mal_nodes...)
 	group_b := append(group.honest2, group.mal_nodes...)
 
+	var actives, failure []node.Node
 	c.tr.Multicast(transport.Time, quorum.Nodes(), variable, func(res *transport.MulticastResponse) bool {
 		if res.Err == nil && len(res.Data) > 0 && len(res.Data) <= 8 {
 			t := binary.BigEndian.Uint64(res.Data)
@@ -91,12 +89,13 @@ func (c *Client) WriteMal(variable []byte, value []byte) error {
 				maxt = t
 			}
 			actives = append(actives, res.Peer)
-			return quorum.IsQuorum(actives)
+			return quorum.IsThreshold(actives)
+		} else {
+			failure = append(failure, res.Peer)
+			return quorum.Reject(failure)
 		}
-		return false
 	})
-
-	if !quorum.IsQuorum(actives) {
+	if !quorum.IsThreshold(actives) {
 		return bftkv.ErrInsufficientNumberOfQuorum
 	}
 
@@ -109,10 +108,12 @@ func (c *Client) WriteMal(variable []byte, value []byte) error {
 	if err1 != nil {
 		return err1
 	}
+
 	err2 := c.signAndWrite(group_b, []byte("second value"), variable, maxt, quorum)
 	if err2 != nil {
 		return err2
 	}
+
 	return nil
 }
 
@@ -136,7 +137,7 @@ func (c *Client) signAndWrite(group []node.Node, value []byte, variable []byte, 
 		return err
 	}
 
-	ss, err := c.crypt.CollectiveSignature.Sign(tbss)	// the first one is self-signed
+	ss, err := c.crypt.CollectiveSignature.Sign(tbss) // the first one is self-signed
 	if err != nil {
 		return err
 	}
@@ -144,21 +145,23 @@ func (c *Client) signAndWrite(group []node.Node, value []byte, variable []byte, 
 	if err != nil {
 		return err
 	}
+	var failure []node.Node
+	var errs []error
 	c.tr.Multicast(transport.Sign, curr_q, pkt, func(res *transport.MulticastResponse) bool {
 		if res.Err == nil {
 			s, err := packet.ParseSignature(res.Data)
-			if err != nil {
-				return false
+			if err == nil {
+				return c.crypt.CollectiveSignature.Combine(ss, s, quorum) // whatever the response is
 			}
-			return c.crypt.CollectiveSignature.Combine(ss, s, quorum)
-
+			errs = append(errs, err)
 		} else {
-			return false
+			errs = append(errs, res.Err)
 		}
+		failure = append(failure, res.Peer)
+		return quorum.Reject(failure)
 	})
-
-	if c.crypt.CollectiveSignature.Verify(pkt, ss, quorum) != nil {
-		return crypto.ErrInsufficientNumberOfSignatures
+	if err := c.crypt.CollectiveSignature.Verify(tbss, ss, quorum); err != nil {
+		return majorityError(errs, err)
 	}
 
 	pkt, err = packet.Serialize(variable, value, sig, maxt, ss)

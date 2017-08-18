@@ -6,7 +6,7 @@ package protocol
 import (
 	"io"
 	"log"
-	"net/url"
+	_ "net/url"
 	"strings"
 
 	"github.com/yahoo/bftkv"
@@ -36,31 +36,8 @@ func NewMalServer(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Trans
 			},
 			st: st,
 		},
-		//tr: tr,
 		malst: st,
 	}
-}
-
-func (s *MalServer) Start() error {
-	// start the server first
-	addr := ""
-	if u, err := url.Parse(s.self.Address()); err == nil {
-		addr = ":" + u.Port()
-	}
-	s.tr.Start(s, addr)
-	log.Printf("Server @ %s running\n", addr)
-
-	// join the network
-	return s.Joining() // for now, wait until collecting all reachable nodes
-}
-
-func (s *MalServer) Stop() {
-	// leave from the network
-	pkt, err := s.self.SerializeSelf()
-	if err == nil {
-		s.tr.Multicast(transport.Leave, s.self.GetPeers(), pkt, nil)
-	}
-	s.tr.Stop()
 }
 
 func (s *MalServer) signResult(req []byte, peer node.Node) ([]byte, error) {

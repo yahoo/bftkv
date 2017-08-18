@@ -16,7 +16,6 @@ import (
 	"github.com/yahoo/bftkv/quorum/wotqs"
 	"github.com/yahoo/bftkv/transport"
 	transport_http "github.com/yahoo/bftkv/transport/http"
-	// transport_http_visual "github.com/yahoo/bftkv/transport/http-visual"
 )
 
 func TestMaliciousCollusion(t *testing.T) {
@@ -32,7 +31,7 @@ func TestMaliciousCollusion(t *testing.T) {
 	var servers []*MalServer
 	wsPort := 6000
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), serverKeyPrefix) {
+		if strings.HasPrefix(f.Name(), serverKeyPrefix) || strings.HasPrefix(f.Name(), "bftkv.r") {
 			s := newMalServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):], wsPort)
 			if err := s.Start(); err != nil {
 				t.Fatal(err)
@@ -112,7 +111,7 @@ func runServers(t *testing.T, port *int, prefixes ...string) []*Server {
 	}
 	var servers []*Server
 	for _, f := range files {
-	        for _, prefix := range prefixes {
+		for _, prefix := range prefixes {
 			if strings.HasPrefix(f.Name(), prefix) {
 				s := newServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):] /*port*/, 0)
 				if err := s.Start(); err != nil {
@@ -146,17 +145,6 @@ func (c *Client) checkTofu(key string, t *testing.T, port *int, exp string) {
 	*port += 1
 }
 
-func newMalClient(path string, wsPort int) *Client {
-	crypt := pgp.New()
-	g := graph.New()
-	readCerts(g, crypt, path+"/pubring.gpg", false)
-	readCerts(g, crypt, path+"/secring.gpg", true)
-	qs := wotqs.New(g)
-	var tr transport.Transport
-	tr = transport_http.New(crypt)
-	return NewClient(node.SelfNode(g), qs, tr, crypt)
-}
-
 func newMalServer(path string, dbPath string, wsPort int) *MalServer {
 	crypt := pgp.New()
 	g := graph.New()
@@ -164,13 +152,6 @@ func newMalServer(path string, dbPath string, wsPort int) *MalServer {
 	readCerts(g, crypt, path+"/secring.gpg", true)
 	qs := wotqs.New(g)
 	var tr transport.Transport
-	/*
-	   if wsPort != 0 {
-	           tr = transport_http_visual.New(crypt, g, qs, strconv.Itoa(wsPort))
-	   } else {
-	           tr = transport_http.New(crypt)
-	   }
-	*/
 	tr = transport_http.MalNew(crypt)
 	storage := MalStorageNew(dbPath)
 	return NewMalServer(node.SelfNode(g), qs, tr, crypt, storage)
