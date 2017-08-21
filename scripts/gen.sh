@@ -10,6 +10,7 @@ uid=""
 if [ "$1" == "-uid" ]; then shift; uid=" <$1>"; shift; fi
 
 for i in "$@"; do
+    rm -fr $i $i.2
     mkdir -p $i $i.2
     chmod 700 $i $i.2
     addr=""

@@ -3,37 +3,39 @@
 # Copyright 2017, Yahoo Holdings Inc.
 # Licensed under the terms of the Apache license. See LICENSE file in project root for terms.
 
-mkdir -p run
-cd run
-export PATH=..:$PATH
+CWD=`pwd`
+export PATH=$CWD:$PATH
+mkdir -p run/keys
+cd run/keys
 
-gen.sh -uid "foo@example.com" bftkv.u01 bftkv.u02 bftkv.u03 bftkv.u99
-gen.sh -port 5601 bftkv.rw01 bftkv.rw02 bftkv.rw03 bftkv.rw04 bftkv.rw05 bftkv.rw06
-gen.sh -port 5701 bftkv.a01 bftkv.a02 bftkv.a03 bftkv.a04 bftkv.a05 bftkv.a06 bftkv.a07 bftkv.a08 bftkv.a09 bftkv.a10
+gen.sh -uid "foo@example.com" u01 u02 u03 u04
+gen.sh -uid "bar@example.com" u11
+gen.sh -port 5601 rw01 rw02 rw03 rw04 rw05 rw06
+gen.sh -port 5701 a01 a02 a03 a04 a05 a06 a07 a08 a09 a10
+gen.sh -port 5801 b01 b02 b03 b04 b05 b06 b07 b08 b09 b10
 
-clique.sh bftkv.a*
+clique.sh a*
+clique.sh b*
 
-trust.sh bftkv.a04 bftkv.rw01
-trust.sh bftkv.a05 bftkv.rw02
-trust.sh bftkv.a06 bftkv.rw03
-trust.sh bftkv.a07 bftkv.rw04
-trust.sh bftkv.a08 bftkv.rw05
-trust.sh bftkv.a09 bftkv.rw06
-trust.sh bftkv.rw01 bftkv.a05 bftkv.a06 bftkv.a07
-trust.sh bftkv.rw02 bftkv.a06 bftkv.a07 bftkv.a08
-trust.sh bftkv.rw03 bftkv.a07 bftkv.a08 bftkv.a09
-trust.sh bftkv.rw04 bftkv.a08 bftkv.a09 bftkv.a10
-trust.sh bftkv.rw05 bftkv.a09 bftkv.a10 bftkv.a01
-trust.sh bftkv.rw06 bftkv.a10 bftkv.a01 bftkv.a02
+trust.sh rw01 a* b*
+trust.sh rw02 a* b*
+trust.sh rw03 a* b*
+trust.sh rw04 a* b*
+trust.sh rw05 a* b*
+trust.sh rw06 a* b*
 
-trust.sh -t signer bftkv.u01 bftkv.a01
-trust.sh -t signer bftkv.u02 bftkv.a02
-trust.sh -t signer bftkv.u03 bftkv.a03
-trust.sh -t signer bftkv.u99 bftkv.a04
+trust.sh -t signer u01 a0[1-6] rw*
+trust.sh -t signer u02 a0[1-6] rw*
+trust.sh -t signer u03 a0[1-6] rw*
+trust.sh -t signer u04 a0[1-6] rw*
+trust.sh -t signer u11 b0[1-6] rw*
 
-# for client certs
-trust.sh -t signee bftkv.a04 bftkv.u01 bftkv.u02 bftkv.u03
-trust.sh -t signee bftkv.a05 bftkv.u01 bftkv.u02 bftkv.u03
-trust.sh -t signee bftkv.a06 bftkv.u01 bftkv.u02 bftkv.u03 
-trust.sh -t signee bftkv.a07 bftkv.u01 bftkv.u02 bftkv.u03
-# do not sign bftkv.u99 for testing
+# for client certs (do not sign u04 for TOFU testing)
+trust.sh -t signee a07 u01 u02 u03
+trust.sh -t signee a08 u01 u02 u03
+trust.sh -t signee a09 u01 u02 u03 
+trust.sh -t signee a10 u01 u02 u03
+trust.sh -t signee b07 u11
+trust.sh -t signee b08 u11
+trust.sh -t signee b09 u11
+trust.sh -t signee b10 u11

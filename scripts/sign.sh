@@ -17,7 +17,7 @@ function e {
 function sign {
     keyid=`gpg --homedir $signer --batch --no-tty --fast-import $1 2>&1 | grep 'gpg: key' | sed 's/.*key \([A-Z0-9]*\):.*/\1/'`
     if [ $? -ne 0 ]; then e "$0: import failed"; return 1; fi
-    gpg --homedir $signer --batch --sign-key --yes $keyid 2>/dev/null
+    gpg --homedir $signer --batch --sign-key --yes $keyid > /dev/null 2>&1
     if [ $? -ne 0 ]; then e "$0: sign-key failed"; return 1; fi
     gpg $output --yes --homedir $signer --export $keyid
     if [ $? -ne 0 ]; then e "$0: export failed"; return 1; fi
