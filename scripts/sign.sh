@@ -15,19 +15,16 @@ function e {
 }
 
 function sign {
-    keyid=`gpg --homedir $signer --batch --no-tty --fast-import $1 2>&1 | grep 'gpg: key' | sed 's/.*key \([A-Z0-9]*\):.*/\1/'`
+    keyid=`gpg2 --homedir .$signer --batch --no-tty --fast-import $1 2>&1 | grep 'gpg: key' | sed 's/.*key \([A-Z0-9]*\):.*/\1/'`
     if [ $? -ne 0 ]; then e "$0: import failed"; return 1; fi
-    gpg --homedir $signer --batch --sign-key --yes $keyid > /dev/null 2>&1
+    gpg2 --homedir .$signer --batch --sign-key --yes $keyid > /dev/null 2>&1
     if [ $? -ne 0 ]; then e "$0: sign-key failed"; return 1; fi
-    gpg $output --yes --homedir $signer --export $keyid
+    gpg2 $output --yes --homedir .$signer --export $keyid
     if [ $? -ne 0 ]; then e "$0: export failed"; return 1; fi
 }
 
-BAK=/tmp/$signer
-rm -fr $BAK
-cp -prf $signer $BAK
+cp -pf .$signer/pubring.kbx{,.bak}
 sign $*
 RET=$?
-cp -prf $BAK .
-rm -fr $BAK
+mv -f .$signer/pubring.kbx{.bak,}
 exit $RET

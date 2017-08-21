@@ -15,7 +15,8 @@ for i in "$@"; do
     av=()
     for j in "$@"; do
 	if [ $j != $i ]; then
-	    gpg --homedir $j --export $j | gpg --homedir $i --batch --no-tty --fast-import > /dev/null 2>&1
+	    gpg2 --homedir .$j --export `basename $j` | gpg2 --homedir .$i --batch --no-tty --fast-import > /dev/null 2>&1
 	fi
     done
+    gpg2 --homedir .$i --batch --no-tty --export > $i/pubring.gpg
 done
