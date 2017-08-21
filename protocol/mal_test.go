@@ -22,22 +22,20 @@ func TestMaliciousCollusion(t *testing.T) {
 	// malicious client writes <x, t, v> and <x, t, v'> to colluding servers
 	// read is attempted for key x => insufficient responses expected
 	mal = []string{"http://localhost:5705", "http://localhost:5708", "http://localhost:5709", "http://localhost:5706", "http://localhost:5707"}
-	files, err := ioutil.ReadDir(scriptPath)
+	files, err := ioutil.ReadDir(keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// create test servers
 	var servers []*MalServer
-	wsPort := 6000
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), serverKeyPrefix) || strings.HasPrefix(f.Name(), "bftkv.r") {
-			s := newMalServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):], wsPort)
+		if strings.HasPrefix(f.Name(), serverKeyPrefix) || strings.HasPrefix(f.Name(), "rw") {
+			s := newMalServer(keyPath+"/"+f.Name(), dbPrefix+f.Name())
 			if err := s.Start(); err != nil {
 				t.Fatal(err)
 			}
 			servers = append(servers, s)
-			wsPort++
 		}
 	}
 
@@ -52,7 +50,7 @@ func TestMaliciousCollusion(t *testing.T) {
 	}()
 
 	// create a client
-	c := newClient(scriptPath+"/"+clientKey, wsPort)
+	c := newClient(keyPath+"/"+clientKey)
 	c.Joining()
 
 	key := []byte(testKey)
@@ -79,33 +77,30 @@ func TestTOFU(t *testing.T) {
 
 	// exp: successful --- the client will write <x, t, v> for the first time
 	// exp: successful --- the client will wrtie <x, t', v'>
-	wsPort := 5040
-	servers := runServers(t, &wsPort, "bftkv.a")
-	c1 := newClient(scriptPath+"/bftkv.u01", wsPort)
+	servers := runServers(t, "a")
+	c1 := newClient(keyPath+"/u01")
 	c1.Joining()
-	c1.checkTofu(uts, t, &wsPort, "original write successful")
-	c1.checkTofu(uts, t, &wsPort, "self overwrite successful")
+	c1.checkTofu(uts, t, "original write successful")
+	c1.checkTofu(uts, t, "self overwrite successful")
 	stopServers(servers)
 
 	// exp: permission denied --- diff user id
-	wsPort = 5050
-	servers = runServers(t, &wsPort, "bftkv.a")
-	c2 := newClient(scriptPath+"/bftkv.u02", wsPort)
+	servers = runServers(t, "bftkv.a")
+	c2 := newClient(keyPath+"/u02")
 	c2.Joining()
-	c2.checkTofu(uts, t, &wsPort, "untrusted entity overwrite successful - expected error")
+	c2.checkTofu(uts, t, "untrusted entity overwrite successful - expected error")
 	stopServers(servers)
 
 	// exp: permission denied --- diff servers will sign for c01 than u1
-	wsPort = 5060
-	servers = runServers(t, &wsPort, "bftkv.a")
-	c3 := newClient(scriptPath+"/bftkv.u99", wsPort)
+	servers = runServers(t, "a")
+	c3 := newClient(keyPath+"/u04")
 	c3.Joining()
-	c3.checkTofu(uts, t, &wsPort, "untrusted entity overwrite successful - expected error")
+	c3.checkTofu(uts, t, "untrusted entity overwrite successful - expected error")
 	stopServers(servers)
 }
 
-func runServers(t *testing.T, port *int, prefixes ...string) []*Server {
-	files, err := ioutil.ReadDir(scriptPath)
+func runServers(t *testing.T, prefixes ...string) []*Server {
+	files, err := ioutil.ReadDir(keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,12 +108,11 @@ func runServers(t *testing.T, port *int, prefixes ...string) []*Server {
 	for _, f := range files {
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(f.Name(), prefix) {
-				s := newServer(scriptPath+"/"+f.Name(), dbPrefix+f.Name()[len(serverKeyPrefix):] /*port*/, 0)
+				s := newServer(keyPath+"/"+f.Name(), dbPrefix+f.Name())
 				if err := s.Start(); err != nil {
 					t.Fatal(err)
 				}
 				servers = append(servers, s)
-				*port += 1
 			}
 		}
 	}
@@ -136,16 +130,26 @@ func stopServers(servers []*Server) {
 	}
 }
 
-func (c *Client) checkTofu(key string, t *testing.T, port *int, exp string) {
+func (c *Client) checkTofu(key string, t *testing.T, exp string) {
 	if err := c.Write([]byte(key), []byte(testValue)); err != nil {
 		t.Log(err)
 	} else {
 		t.Log(exp)
 	}
-	*port += 1
 }
 
-func newMalServer(path string, dbPath string, wsPort int) *MalServer {
+func newMalClient(path string) *Client {
+	crypt := pgp.New()
+	g := graph.New()
+	readCerts(g, crypt, path+"/pubring.gpg", false)
+	readCerts(g, crypt, path+"/secring.gpg", true)
+	qs := wotqs.New(g)
+	var tr transport.Transport
+	tr = transport_http.New(crypt)
+	return NewClient(node.SelfNode(g), qs, tr, crypt)
+}
+
+func newMalServer(path string, dbPath string) *MalServer {
 	crypt := pgp.New()
 	g := graph.New()
 	readCerts(g, crypt, path+"/pubring.gpg", false)

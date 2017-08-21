@@ -6,7 +6,6 @@ package graph
 import (
 	"testing"
 	"sort"
-	"strings"
 	"io/ioutil"
 	"os"
 	"log"
@@ -17,9 +16,8 @@ import (
 )
 
 const (
-	maxDistance = 3
-	keyPrefix = "bftkv."
-	scriptPath = "../../scripts/run"
+	maxDistance = -1
+	keyPath = "../../scripts/run/keys"
 )
 
 type Keyring struct {
@@ -56,16 +54,14 @@ func constructGraph() (*Graph, error) {
 	g := New()
 	crypt := pgp.New()
 
-	files, err := ioutil.ReadDir(scriptPath)
+	files, err := ioutil.ReadDir(keyPath)
 	if err != nil {
 		return nil, err
 	}
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), keyPrefix) {
-			path := scriptPath + "/" + f.Name()
-			readCerts(g, crypt, path + "/pubring.gpg", false)
-			readCerts(g, crypt, path + "/secring.gpg", true)
-		}
+		path := keyPath + "/" + f.Name()
+		readCerts(g, crypt, path + "/pubring.gpg", false)
+		readCerts(g, crypt, path + "/secring.gpg", true)
 	}
 	return g, nil
 }
@@ -224,6 +220,6 @@ func readCerts(g *Graph, crypt *crypto.Crypto, path string, sec bool) {
 	} else {
 		g.AddNodes(certs)
 	}
-	crypt.Keyring.Register(certs, sec)
+	crypt.Keyring.Register(certs, sec, true)
 	f.Close()
 }

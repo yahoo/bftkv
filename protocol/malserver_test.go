@@ -49,8 +49,7 @@ func (s *MalServer) Start() error {
 		s.tr.Start(s, addr)
 		log.Printf("Server @ %s running\n", addr)
 	}
-
-	return s.Joining()
+	return nil
 }
 
 func (s *MalServer) signResult(req []byte, peer node.Node) ([]byte, error) {

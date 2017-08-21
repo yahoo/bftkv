@@ -24,6 +24,11 @@ type Graph struct {
 	mutex sync.Mutex
 }
 
+type Clique struct {
+	Nodes []node.Node
+	Weight int
+}
+
 func NewVertex(instance node.Node) *Vertex {
 	return &Vertex{
 		Instance: instance,
@@ -262,8 +267,8 @@ func (g *Graph) GetReachableNodes(sid uint64, distance int) []node.Node {
 	return nodes
 }
 
-func (g *Graph) GetCliques(sid uint64, distance int) [][]node.Node {
-	var cliques [][]node.Node
+func (g *Graph) GetCliques(sid uint64, distance int) []Clique {
+	var cliques []Clique
 	v, ok := g.Vertices[sid]
 	if !ok || v.Instance == nil {
 		return cliques
@@ -276,7 +281,8 @@ func (g *Graph) GetCliques(sid uint64, distance int) [][]node.Node {
 			if !inClique(vd.v.Instance, cliques) {
 				clique := g.findMaximalClique(vd.v)
 				if clique != nil {
-					cliques = append(cliques, clique)
+					putWeight(v, clique)
+					cliques = append(cliques, *clique)
 				}
 			}
 		}
@@ -285,9 +291,9 @@ func (g *Graph) GetCliques(sid uint64, distance int) [][]node.Node {
 	return cliques
 }
 
-func inClique(e node.Node, cliques [][]node.Node) bool {
+func inClique(e node.Node, cliques []Clique) bool {
 	for _, c := range cliques {
-		for _, n := range c {
+		for _, n := range c.Nodes {
 			if e.Id() == n.Id() {
 				return true
 			}
@@ -297,7 +303,7 @@ func inClique(e node.Node, cliques [][]node.Node) bool {
 }
 
 // find a single maximal clique, assuming there exists only one maximal clique that includes 's' therefore maximal = maximum
-func (g * Graph) findMaximalClique(s *Vertex) []node.Node {
+func (g * Graph) findMaximalClique(s *Vertex) *Clique {
 	clique := []*Vertex{s}
 	// walk thru all nodes
 	for _, v := range g.Vertices {
@@ -315,15 +321,15 @@ func (g * Graph) findMaximalClique(s *Vertex) []node.Node {
 	// check if the clique is unique
 	for _, v := range g.Vertices {
 		if v.Instance != nil && v != s && !inVertices(v, clique) && bidirect(v, []*Vertex{s}) {
-			log.Printf("graph: found more than one maximal cliques for %s", s.Instance.Name())
+			log.Printf("graph: found more than one maximal cliques for %s <-> %s", s.Instance.Name(), v.Instance.Name())
 			return nil
 		}
 	}
 
 	// return nodes
-	var res []node.Node
+	res := &Clique{}
 	for _, c := range clique {
-		res = append(res, c.Instance)
+		res.Nodes = append(res.Nodes, c.Instance)
 	}
 	return res
 }
@@ -347,6 +353,41 @@ func inVertices(e *Vertex, s []*Vertex) bool {
 		}
 	}
 	return false
+}
+
+func putWeight(s *Vertex, clique *Clique) {
+	for i, _ := range s.Edges {
+		for _, n := range clique.Nodes {
+			if n.Id() == i {
+				clique.Weight++
+			}
+		}
+	}
+}
+
+func (g *Graph) GetInReachable(destinations []node.Node) []node.Node {
+	var res []node.Node
+	self := g.GetSelfId()
+	for _, v := range g.Vertices {
+		if v.Instance == nil || v.Instance.Id() == self {
+			continue
+		}
+		tid := v.Instance.Id()
+		found := false
+		for _, d := range destinations {
+			did := d.Id()
+			if did == tid {	// exclude destinations themselves from the result
+				found = false
+				break
+			} else if _, ok := v.Edges[did]; ok {
+				found = true
+			}
+		}
+		if found {
+			res = append(res, v.Instance)
+		}
+	}
+	return res
 }
 
 func bfs(v *Vertex, proc func(vd vertexDistance) bool) {

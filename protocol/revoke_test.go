@@ -15,7 +15,7 @@ import (
 )
 
 func getClient(client_loc string) *Client {
-	path := scriptPath + "/bftkv." + client_loc
+	path := keyPath + "/" + client_loc
 	crypt := pgp.New()
 	g := graph.New()
 	pubring := path + "/pubring.gpg"

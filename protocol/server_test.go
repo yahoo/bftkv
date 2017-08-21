@@ -6,7 +6,6 @@ package protocol
 import (
         "os"
 	"log"
-	"strconv"
         "strings"
 	"testing"
 	"io/ioutil"
@@ -20,15 +19,14 @@ import (
         storage_plain "github.com/yahoo/bftkv/storage/plain"
         "github.com/yahoo/bftkv/transport"
         transport_http "github.com/yahoo/bftkv/transport/http"
-        transport_http_visual "github.com/yahoo/bftkv/transport/http-visual"
 )
 
 const (
-	scriptPath = "../scripts/run"	// any way to specify the absolute path?
-	serverKeyPrefix = "bftkv.a"
-	clientKey = "bftkv.u01"
-	dbPrefix = scriptPath + "/db."
-	wsPortStart = 5001
+	scriptPath = "../scripts"	// any way to specify the absolute path?
+	keyPath = scriptPath + "/run/keys"	
+	serverKeyPrefix = "a"
+	clientKey = "u01"
+	dbPrefix = scriptPath + "/run/db."
 	testKey = "test"
 	testValue = "test"
 )
@@ -37,22 +35,20 @@ const (
 
 
 func TestServer(t *testing.T) {
-	files, err := ioutil.ReadDir(scriptPath)
+	files, err := ioutil.ReadDir(keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// create test servers
 	var servers []*Server
-	wsPort := wsPortStart
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), serverKeyPrefix) || strings.HasPrefix(f.Name(), "bftkv.r") {
-			s := newServer(scriptPath + "/" + f.Name(), dbPrefix + f.Name()[len(serverKeyPrefix):], wsPort)	// for now
+		if strings.HasPrefix(f.Name(), serverKeyPrefix) || strings.HasPrefix(f.Name(), "rw") {
+			s := newServer(keyPath + "/" + f.Name(), dbPrefix + f.Name())
 			if err := s.Start(); err != nil {
 				t.Fatal(err)
 			}
 			servers = append(servers, s)
-			wsPort++
 		}
 	}
 	// joining each other
@@ -67,7 +63,7 @@ func TestServer(t *testing.T) {
 	}()
 
 	// create a client
-	c := newClient(scriptPath + "/" + clientKey, /*wsPort*/0)
+	c := newClient(keyPath + "/" + clientKey)
 	c.Joining()
 
 	key := []byte(testKey)
@@ -84,34 +80,26 @@ func TestServer(t *testing.T) {
 	}
 }
 
-func newServer(path string, dbPath string, wsPort int) *Server {
+func newServer(path string, dbPath string) *Server {
 	crypt := pgp.New()
 	g := graph.New()
 	readCerts(g, crypt, path + "/pubring.gpg", false)
 	readCerts(g, crypt, path + "/secring.gpg", true)
 	qs := wotqs.New(g)
 	var tr transport.Transport
-	if wsPort != 0 {
-		tr = transport_http_visual.New(crypt, g, qs, strconv.Itoa(wsPort))
-	} else {
-		tr = transport_http.New(crypt)
-	}
+	tr = transport_http.New(crypt)
 	storage := storage_plain.New(dbPath)
 	return NewServer(node.SelfNode(g), qs, tr, crypt, storage)
 }
 
-func newClient(path string, wsPort int) *Client {
+func newClient(path string) *Client {
 	crypt := pgp.New()
 	g := graph.New()
 	readCerts(g, crypt, path + "/pubring.gpg", false)
 	readCerts(g, crypt, path + "/secring.gpg", true)
 	qs := wotqs.New(g)
 	var tr transport.Transport
-	if wsPort != 0 {
-		tr = transport_http_visual.New(crypt, g, qs, strconv.Itoa(wsPort))
-	} else {
-		tr = transport_http.New(crypt)
-	}
+	tr = transport_http.New(crypt)
 	return NewClient(node.SelfNode(g), qs, tr, crypt)
 }
 

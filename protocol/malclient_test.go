@@ -30,12 +30,12 @@ func getCliques(g *graph.Graph) [][]node.Node {
 	// choose cliques that have only sufficient number of nodes
 	var nodes [][]node.Node
 	for _, clique := range cliques {
-		n := len(clique)
+		n := len(clique.Nodes)
 		if n == 0 {
 			continue
 		}
 		if (n-1)/3 >= 1 {
-			nodes = append(nodes, clique)
+			nodes = append(nodes, clique.Nodes)
 		}
 	}
 	return nodes

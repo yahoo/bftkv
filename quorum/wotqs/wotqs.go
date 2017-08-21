@@ -27,7 +27,6 @@ type qc struct {	// quarum clique
 
 type wotq struct {
 	qcs []qc
-	cert bool
 }
 
 func howmany(a, b int) int {
@@ -38,13 +37,13 @@ func New(g *graph.Graph) quorum.QuorumSystem {
 	return &wot{g: g}
 }
 
-func newQC(nodes []node.Node, rw int) *qc {
-	n := len(nodes)
+func newQC(clique graph.Clique, rw int) *qc {
+	n := len(clique.Nodes)
 	if n == 0 {
 		return nil
 	}
-	if rw == 0 {
-		return &qc{nodes, 0, 0, 0, 0}
+	if rw == quorum.WRITE {
+		return &qc{clique.Nodes, 0, 0, 0, 0}
 	}
 	f := (n - 1) / 3
 	if f >= 1 {
@@ -54,13 +53,16 @@ func newQC(nodes []node.Node, rw int) *qc {
 		if (rw & quorum.CERT) != 0 {
 			threshold = f + 1
 		}
-		return &qc{nodes, f, min, threshold, suff}
+		if clique.Weight <= n - suff {
+			suff = 0
+		}
+		return &qc{clique.Nodes, f, min, threshold, suff}
 	} else {
 		return nil
 	}
 }
 
-func complement(u []node.Node, c []qc, e []qc, extra bool) []qc {
+func complement(u []node.Node, c []qc, e []qc, rw int) []qc {
 	var nodes []node.Node
 	for _, n1 := range u {
 		found := false
@@ -77,40 +79,40 @@ func complement(u []node.Node, c []qc, e []qc, extra bool) []qc {
 			nodes = append(nodes, n1)
 		}
 	}
-	if q := newQC(nodes, 0); q != nil {
+	if q := newQC(graph.Clique{nodes, 0}, rw); q != nil {
 		e = append(e, *q)
 	}
 	return e
 }
 
-func (qs *wot) getQuorumFrom(rw int, s uint64) *wotq {
+func (qs *wot) getQuorumFrom(rw int, s uint64, distance int) *wotq {
 	q := &wotq{}
-	cliques := qs.g.GetCliques(s, maxCliqueDistance)
+	cliques := qs.g.GetCliques(s, distance)
 	for _, c := range cliques {
-		if qc := newQC(c, rw); qc != nil {
+		if qc := newQC(c, rw | quorum.AUTH); qc != nil {
 			q.qcs = append(q.qcs, *qc)
 		}
-	}
-	if (rw & quorum.AUTH) != 0 {
-		// fall through
 	}
 	if (rw & (quorum.READ | quorum.WRITE)) != 0 {
 		qcs := q.qcs
 		if (rw & quorum.AUTH) == 0 {
 			qcs = nil
 		}
-		qcs = complement(qs.g.GetReachableNodes(s, maxCliqueDistance + 1), q.qcs, qcs, false)	// R = {Vi} - {Ci}
+		qcs = complement(qs.g.GetReachableNodes(s, distance), q.qcs, qcs, quorum.READ)	// R = {Vi} - {Ci}
 		if (rw & quorum.WRITE) != 0 {
-			qcs = complement(qs.g.GetPeers(), q.qcs, qcs, true)	// W = U - {Ci} + R
+			qcs = complement(qs.g.GetPeers(), append(q.qcs, qcs...), qcs, quorum.WRITE)	// W = U - {Ci} + R
 		}
 		q.qcs = qcs
 	}
-	q.cert = (rw & quorum.CERT) != 0
 	return q
 }
 
 func (qs *wot) ChooseQuorum(rw int) quorum.Quorum {
-	return qs.getQuorumFrom(rw, qs.g.GetSelfId())
+	distance := maxCliqueDistance
+	if (rw & quorum.CERT) != 0 {
+		distance = 0
+	}
+	return qs.getQuorumFrom(rw, qs.g.GetSelfId(), distance)
 }
 
 //
@@ -146,42 +148,30 @@ func (q *wotq) IsThreshold(nodes []node.Node) bool {
 	if len(q.qcs) == 0 {
 		return false
 	}
-	if q.cert {
-		for _, qc := range q.qcs {
-			if qc.f > 0 && len(intersection(nodes, qc.nodes)) >= qc.threshold {
-				return true
-			}
-		}
-		return false
-	} else {
-		for _, qc := range q.qcs {
-			if qc.f > 0 && len(intersection(nodes, qc.nodes)) < qc.threshold {
-				return false
-			}
-		}
-		return true
-	}
-}
-
-func (q *wotq) IsSufficient(nodes []node.Node) bool {
-	if len(q.qcs) == 0 {
-		return false
-	}
 	for _, qc := range q.qcs {
-		if qc.f > 0 && len(intersection(nodes, qc.nodes)) < qc.suff {
+		if qc.f > 0 && len(intersection(nodes, qc.nodes)) < qc.threshold {
 			return false
 		}
 	}
 	return true
 }
 
-func (q *wotq) Reject(nodes []node.Node) bool {
+func (q *wotq) IsSufficient(nodes []node.Node) bool {
 	for _, qc := range q.qcs {
-		if qc.f > 0 && len(intersection(nodes, qc.nodes)) > qc.f {
+		if qc.suff > 0 && len(intersection(nodes, qc.nodes)) >= qc.suff {
 			return true
 		}
 	}
 	return false
+}
+
+func (q *wotq) Reject(nodes []node.Node) bool {
+	for _, qc := range q.qcs {
+		if qc.f == 0 || len(intersection(nodes, qc.nodes)) <= qc.f {
+			return false
+		}
+	}
+	return true
 }
 
 func intersection(s1, s2 []node.Node) []node.Node {

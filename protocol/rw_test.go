@@ -22,10 +22,9 @@ func init() {
 
 func TestManyWrites(t *testing.T) {
 	// prints average time of writes
-	wsPort := 7010
-	servers := runServers(t, &wsPort, "bftkv.a", "bftkv.r")
+	servers := runServers(t, "a", "rw")
 	defer stopServers(servers)
-	c := newClient(scriptPath+"/bftkv.a01", wsPort)
+	c := newClient(keyPath+"/a01")
 	c.Joining()
 	start := time.Now()
 	for n := 0; n < rounds; n++ {
@@ -40,10 +39,9 @@ func TestManyWrites(t *testing.T) {
 
 func TestManyReads(t *testing.T) {
 	// prints average time of reads
-	wsPort := 7020
-	servers := runServers(t, &wsPort, "bftkv.a", "bftkv.r")
+	servers := runServers(t, "a", "rw")
 	defer stopServers(servers)
-	c := newClient(scriptPath+"/bftkv.a01", wsPort)
+	c := newClient(keyPath+"/a01")
 	c.Joining()
 	err := c.Write([]byte("ghi"), []byte("jkl"))
 	if err != nil {
@@ -62,18 +60,16 @@ func TestManyReads(t *testing.T) {
 
 func TestManyClientsConcurrentReads(t *testing.T) {
 	// concurrent reads by different clients to the same quorum for the same <x, t>
-	wsPort := 7040
-	servers := runServers(t, &wsPort, "bftkv.a", "bftkv.r")
+	servers := runServers(t, "a", "rw")
 	defer stopServers(servers)
-	c1 := newClient(scriptPath+"/bftkv.a01", wsPort)
+	c1 := newClient(keyPath+"/a01")
 	c1.Joining()
-	wsPort += 1
 	err := c1.Write([]byte("mno"), []byte("pqr"))
 	if err != nil {
 		t.Log(err)
 	}
 	clients := []*Client{c1}
-	startManyClients([]string{"a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09"}, &clients, 7041)
+	startManyClients([]string{"a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09"}, &clients)
 	num_clients := len(clients)
 	ch := make(chan int, num_clients)
 	for _, client := range clients {
@@ -90,23 +86,21 @@ func TestManyClientsConcurrentReads(t *testing.T) {
 	}
 }
 
-func startManyClients(c_paths []string, clients *[]*Client, wsPort int) {
+func startManyClients(c_paths []string, clients *[]*Client) {
 	for _, c_path := range c_paths {
-		c := newClient(scriptPath+"/bftkv."+c_path, wsPort)
+		c := newClient(keyPath+"/"+c_path)
 		c.Joining()
 		*clients = append(*clients, c)
-		wsPort += 1
 	}
 }
 
 func TestManyClientsConcurrentWrites(t *testing.T) {
 	// multiple different clients will write to different keys multiple times concurrently
 	// no maximum - crashes when exceeding max # of open files
-	wsPort := 7060
-	servers := runServers(t, &wsPort, "bftkv.a", "bftkv.r")
+	servers := runServers(t, "a", "rw")
 	defer stopServers(servers)
 	var clients []*Client
-	startManyClients([]string{"a01", "a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09"}, &clients, 7061)
+	startManyClients([]string{"a01", "a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09"}, &clients)
 
 	ch_len := len(clients)
 	ch := make(chan int, ch_len)

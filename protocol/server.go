@@ -47,9 +47,7 @@ func (s *Server) Start() error {
 		s.tr.Start(s, addr)
 		log.Printf("Server @ %s running\n", addr)
 	}
-
-	// join the network
-	return s.Joining()	// for now, wait until collecting all reachable nodes
+	return nil
 }
 
 func (s *Server) Stop() {
@@ -159,23 +157,22 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 		return nil, bftkv.ErrMalformedRequest
 	}
 
+	// verify the signature with the quorum certs
 	issuer := s.crypt.Signature.Issuer(sig)
 	if issuer == nil {
 		return nil, crypto.ErrCertificateNotFound
 	}
-	// check |Q ^ {signers}| > f
-	q := s.qs.ChooseQuorum(quorum.AUTH | quorum.CERT)
-	if !q.IsThreshold(s.crypt.Certificate.Signers(issuer)) {
-		return nil, bftkv.ErrInvalidQuorumCertificate
-	}
-
-	// check the signature with the issuer
 	tbs, err := packet.TBS(req)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.crypt.Signature.VerifyWithCertificate(tbs, sig, issuer); err != nil {
 		return nil, err
+	}
+	// check the certs part
+	q := s.qs.ChooseQuorum(quorum.AUTH | quorum.CERT)
+	if !q.IsThreshold(s.crypt.Certificate.Signers(issuer)) {
+		return nil, bftkv.ErrInvalidQuorumCertificate
 	}
 
 	rdata, err := s.st.Read(variable, 0)	// read the latest one
@@ -188,24 +185,9 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 
 	if rdata != nil {
 		// the variable already exists
-		_, rval, rsig, rt, rss, err := packet.Parse(rdata)
+		_, rval, _, rt, rss, err := packet.Parse(rdata)
 		if err != nil {
 			return nil, err
-		}
-
-		// check the TOFU policy -- check if the signers are same or the new signer is trusted by a quorum
-		prevIssuer := s.crypt.Signature.Issuer(rsig)
-		if prevIssuer == nil {
-			return nil, crypto.ErrCertificateNotFound	// should not happen
-		}
-		if prevIssuer.Id() != issuer.Id() {	// a new public key
-			if prevIssuer.UId() != issuer.UId() {	// must be the same identity
-				return nil, bftkv.ErrPermissionDenied
-			}
-			q := s.qs.ChooseQuorum(quorum.AUTH | quorum.CERT)
-			if !q.IsThreshold(s.crypt.Certificate.Signers(issuer)) {	// enough signers from the quorum trusted by the prev one
-				return nil, bftkv.ErrPermissionDenied
-			}
 		}
 
 		// make sure that it does not sign both <x, v, t> and <x, v', t>
@@ -253,7 +235,6 @@ func (s *Server) write(req []byte, peer node.Node) ([]byte, error) {
 	}
 
 	// check if sufficient number of quorum members have signed the same <x, v, t>
-	// as a faulty writer can divide quorum members into two sets which do not intersect.
 	tbss, err := packet.TBSS(req)
 	if err != nil {
 		return nil, err
@@ -269,7 +250,7 @@ func (s *Server) write(req []byte, peer node.Node) ([]byte, error) {
 		}
 	}
 	if rdata != nil {
-		_, rval, _, rt, rss, err := packet.Parse(rdata)
+		_, rval, rsig, rt, rss, err := packet.Parse(rdata)
 		if err != nil {
 			return nil, err
 		}
@@ -282,6 +263,17 @@ func (s *Server) write(req []byte, peer node.Node) ([]byte, error) {
 			// @@ should remove ss^rss from ss on the storage as well??
 			return nil, bftkv.ErrEquivocation
 		}
+
+		// check the TOFU policy -- check if the signers are same or the new signer is trusted by a quorum
+		newIssuer := s.crypt.Signature.Issuer(sig)
+		prevIssuer := s.crypt.Signature.Issuer(rsig)
+		if newIssuer == nil || prevIssuer == nil {
+			return nil, crypto.ErrCertificateNotFound	// should not happen
+		}
+		if prevIssuer.Id() != newIssuer.Id() && prevIssuer.UId() != newIssuer.UId() {
+			return nil, bftkv.ErrPermissionDenied
+		}
+
 	}
 
 	if err := s.st.Write(variable, t, req); err != nil {
