@@ -39,10 +39,6 @@ func TestMaliciousCollusion(t *testing.T) {
 		}
 	}
 
-	for _, s := range servers {
-		s.Joining()
-	}
-
 	defer func() {
 		for _, s := range servers {
 			s.Stop()
@@ -115,10 +111,6 @@ func runServers(t *testing.T, prefixes ...string) []*Server {
 				servers = append(servers, s)
 			}
 		}
-	}
-
-	for _, s := range servers {
-		s.Joining()
 	}
 
 	return servers

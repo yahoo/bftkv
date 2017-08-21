@@ -51,10 +51,6 @@ func TestServer(t *testing.T) {
 			servers = append(servers, s)
 		}
 	}
-	// joining each other
-	for _, s := range servers {
-		s.Joining()
-	}
 
 	defer func() {
 		for _, s := range servers {
