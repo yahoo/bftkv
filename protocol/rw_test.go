@@ -4,7 +4,6 @@
 package protocol
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"strconv"
@@ -36,6 +35,8 @@ func TestConflict(t *testing.T) {
 			err := client.Write([]byte(k), []byte(client.self.Name()))
 			if err != nil {
 				t.Log(err)
+			} else {
+				t.Log("Winner: ", client.self.Name())
 			}
 			ch <- 1
 		}(client)
@@ -46,20 +47,10 @@ func TestConflict(t *testing.T) {
 
 	c4 := newClient(keyPath + "/u04")
 	c4.Joining()
-	res, err := c4.Read([]byte(k))
+	_, err := c4.Read([]byte(k))
 	if err != nil {
 		t.Log(err)
 	}
-
-	// any one of the concurrent write values is accepted
-	for _, client := range clients {
-		if bytes.Equal([]byte(client.self.Name()), []byte(res)) {
-			t.Log("Winner: ", string(res))
-			return
-		}
-	}
-	fmt.Printf("Expected: %s, Received: %s\n", k, string(res))
-
 }
 
 func TestManyWrites(t *testing.T) {
