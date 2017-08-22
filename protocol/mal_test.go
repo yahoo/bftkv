@@ -30,7 +30,7 @@ func TestMaliciousCollusion(t *testing.T) {
 	// create test servers
 	var servers []*MalServer
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), serverKeyPrefix) || strings.HasPrefix(f.Name(), "rw") {
+		if strings.HasPrefix(f.Name(), "a") || strings.HasPrefix(f.Name(), "rw") {
 			s := newMalServer(keyPath+"/"+f.Name(), dbPrefix+f.Name())
 			if err := s.Start(); err != nil {
 				t.Fatal(err)
@@ -73,7 +73,7 @@ func TestTOFU(t *testing.T) {
 
 	// exp: successful --- the client will write <x, t, v> for the first time
 	// exp: successful --- the client will wrtie <x, t', v'>
-	servers := runServers(t, "a")
+	servers := runServers(t, "a", "rw")
 	c1 := newClient(keyPath+"/u01")
 	c1.Joining()
 	c1.checkTofu(uts, t, "original write successful")
@@ -81,14 +81,14 @@ func TestTOFU(t *testing.T) {
 	stopServers(servers)
 
 	// exp: permission denied --- diff user id
-	servers = runServers(t, "bftkv.a")
+	servers = runServers(t, "a", "rw")
 	c2 := newClient(keyPath+"/u02")
 	c2.Joining()
 	c2.checkTofu(uts, t, "untrusted entity overwrite successful - expected error")
 	stopServers(servers)
 
 	// exp: permission denied --- diff servers will sign for c01 than u1
-	servers = runServers(t, "a")
+	servers = runServers(t, "a", "rw")
 	c3 := newClient(keyPath+"/u04")
 	c3.Joining()
 	c3.checkTofu(uts, t, "untrusted entity overwrite successful - expected error")
