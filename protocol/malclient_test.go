@@ -25,17 +25,17 @@ type nodeGroup struct {
 	mal_nodes []node.Node
 }
 
-func getCliques(g *graph.Graph) [][]node.Node {
+func getCliques(g *graph.Graph) []node.Node {
 	cliques := g.GetCliques(g.GetSelfId(), -1)
 	// choose cliques that have only sufficient number of nodes
-	var nodes [][]node.Node
+	var nodes []node.Node
 	for _, clique := range cliques {
 		n := len(clique.Nodes)
 		if n == 0 {
 			continue
 		}
-		if (n-1)/3 >= 1 {
-			nodes = append(nodes, clique.Nodes)
+		for _, i := range clique.Nodes {
+			nodes = append(nodes, i)
 		}
 	}
 	return nodes
@@ -46,26 +46,23 @@ func (c *Client) getNodeGroup() nodeGroup {
 	// and isolates the malicious nodes further
 	all := getCliques(c.self.(*graph.Graph))
 	var group nodeGroup
-	for i := range all {
-		ctr := true
-		clique := all[i]
-		for _, client := range clique {
-			flag := true
-			for _, malicious := range mal {
-				if strings.Compare(malicious, client.Address()) == 0 {
-					group.mal_nodes = append(group.mal_nodes, client)
-					flag = false
-					break
-				}
+	ctr := true
+	for _, client := range all {
+		flag := true
+		for _, malicious := range mal {
+			if strings.Compare(malicious, client.Address()) == 0 {
+				group.mal_nodes = append(group.mal_nodes, client)
+				flag = false
+				break
 			}
-			if flag {
-				if ctr {
-					group.honest1 = append(group.honest1, client)
-					ctr = false
-				} else {
-					group.honest2 = append(group.honest2, client)
-					ctr = true
-				}
+		}
+		if flag {
+			if ctr {
+				group.honest1 = append(group.honest1, client)
+				ctr = false
+			} else {
+				group.honest2 = append(group.honest2, client)
+				ctr = true
 			}
 		}
 	}
@@ -78,6 +75,7 @@ func (c *Client) WriteMal(variable []byte, value []byte) error {
 	quorum := c.qs.ChooseQuorum(quorum.AUTH)
 	maxt := uint64(0)
 	group := c.getNodeGroup()
+
 	group_a := append(group.honest1, group.mal_nodes...)
 	group_b := append(group.honest2, group.mal_nodes...)
 
@@ -108,7 +106,6 @@ func (c *Client) WriteMal(variable []byte, value []byte) error {
 	if err1 != nil {
 		return err1
 	}
-
 	err2 := c.signAndWrite(group_b, []byte("second value"), variable, maxt, quorum)
 	if err2 != nil {
 		return err2

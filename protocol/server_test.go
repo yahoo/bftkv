@@ -31,9 +31,6 @@ const (
 	testValue = "test"
 )
 
-//colludingNodes = [2]string{"http://localhost:5704", "http://localhost:5805"}
-
-
 func TestServer(t *testing.T) {
 	files, err := ioutil.ReadDir(keyPath)
 	if err != nil {

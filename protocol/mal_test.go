@@ -21,7 +21,7 @@ import (
 func TestMaliciousCollusion(t *testing.T) {
 	// malicious client writes <x, t, v> and <x, t, v'> to colluding servers
 	// read is attempted for key x => insufficient responses expected
-	mal = []string{"http://localhost:5705", "http://localhost:5708", "http://localhost:5709", "http://localhost:5706", "http://localhost:5707"}
+	mal = []string{"http://localhost:5705", "http://localhost:5708", "http://localhost:5709", "http://localhost:5706", "http://localhost:5707", "http://localhost:5602", "http://localhost:5603", "http://localhost:5604"}
 	files, err := ioutil.ReadDir(keyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestMaliciousCollusion(t *testing.T) {
 	}
 
 	res, err := c.Read(key)
-	time.Sleep(time.Second * 1) // sleep to leave time for revoke check
+	time.Sleep(time.Second * 3) // sleep to leave time for revoke check
 	if err != nil {
 		t.Fatal(err)
 	}
