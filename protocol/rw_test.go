@@ -4,6 +4,7 @@
 package protocol
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"strconv"
@@ -20,11 +21,52 @@ func init() {
 	rounds, _ = strconv.Atoi(*num_rounds)
 }
 
+func TestConflict(t *testing.T) {
+	// make writes for new value from several different clients concurrently
+	// expecting invalid signature request twice and ultimately successful read
+	servers := runServers(t, "a", "rw")
+	defer stopServers(servers)
+	var clients []*Client
+	startManyClients([]string{"u01", "u02", "u03"}, &clients)
+
+	ch := make(chan int, len(clients))
+	k := time.Now().String()
+	for _, client := range clients {
+		go func(client *Client) {
+			err := client.Write([]byte(k), []byte(client.self.Name()))
+			if err != nil {
+				t.Log(err)
+			}
+			ch <- 1
+		}(client)
+	}
+	for i := 0; i < len(clients); i++ {
+		<-ch
+	}
+
+	c4 := newClient(keyPath + "/u04")
+	c4.Joining()
+	res, err := c4.Read([]byte(k))
+	if err != nil {
+		t.Log(err)
+	}
+
+	// any one of the concurrent write values is accepted
+	for _, client := range clients {
+		if bytes.Equal([]byte(client.self.Name()), []byte(res)) {
+			t.Log("Winner: ", string(res))
+			return
+		}
+	}
+	fmt.Printf("Expected: %s, Received: %s\n", k, string(res))
+
+}
+
 func TestManyWrites(t *testing.T) {
 	// prints average time of writes
 	servers := runServers(t, "a", "rw")
 	defer stopServers(servers)
-	c := newClient(keyPath+"/a01")
+	c := newClient(keyPath + "/u01")
 	c.Joining()
 	start := time.Now()
 	for n := 0; n < rounds; n++ {
@@ -41,7 +83,7 @@ func TestManyReads(t *testing.T) {
 	// prints average time of reads
 	servers := runServers(t, "a", "rw")
 	defer stopServers(servers)
-	c := newClient(keyPath+"/a01")
+	c := newClient(keyPath + "/u01")
 	c.Joining()
 	err := c.Write([]byte("ghi"), []byte("jkl"))
 	if err != nil {
@@ -62,14 +104,14 @@ func TestManyClientsConcurrentReads(t *testing.T) {
 	// concurrent reads by different clients to the same quorum for the same <x, t>
 	servers := runServers(t, "a", "rw")
 	defer stopServers(servers)
-	c1 := newClient(keyPath+"/a01")
+	c1 := newClient(keyPath + "/u01")
 	c1.Joining()
 	err := c1.Write([]byte("mno"), []byte("pqr"))
 	if err != nil {
 		t.Log(err)
 	}
 	clients := []*Client{c1}
-	startManyClients([]string{"a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09"}, &clients)
+	startManyClients([]string{"u01"}, &clients)
 	num_clients := len(clients)
 	ch := make(chan int, num_clients)
 	for _, client := range clients {
@@ -88,7 +130,7 @@ func TestManyClientsConcurrentReads(t *testing.T) {
 
 func startManyClients(c_paths []string, clients *[]*Client) {
 	for _, c_path := range c_paths {
-		c := newClient(keyPath+"/"+c_path)
+		c := newClient(keyPath + "/" + c_path)
 		c.Joining()
 		*clients = append(*clients, c)
 	}
@@ -100,7 +142,7 @@ func TestManyClientsConcurrentWrites(t *testing.T) {
 	servers := runServers(t, "a", "rw")
 	defer stopServers(servers)
 	var clients []*Client
-	startManyClients([]string{"a01", "a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09"}, &clients)
+	startManyClients([]string{"u01"}, &clients)
 
 	ch_len := len(clients)
 	ch := make(chan int, ch_len)
