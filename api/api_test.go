@@ -14,10 +14,11 @@ const (
 )
 
 func TestAPI(t *testing.T) {
-	client, err := CreateClient("../scripts/run/keys/u01")
+	client, err := OpenClient("../scripts/run/keys/u01")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer CloseClient(client)
 	key := []byte(testKey)
 	value := []byte(testValue)
 

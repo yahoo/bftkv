@@ -15,7 +15,7 @@ import (
 	transport_http "github.com/yahoo/bftkv/transport/http"
 )
 
-func CreateClient(path string) (*protocol.Client, error) {
+func OpenClient(path string) (*protocol.Client, error) {
 	// crypt package
 	crypt := pgp.New()
 
@@ -36,6 +36,10 @@ func CreateClient(path string) (*protocol.Client, error) {
 		return nil, err
 	}
 	return client, nil
+}
+
+func CloseClient(client *protocol.Client) {
+	client.Leaving()
 }
 
 func readCerts(g *graph.Graph, crypt *crypto.Crypto, path string, sec bool) error {
