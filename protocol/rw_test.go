@@ -4,6 +4,7 @@
 package protocol
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"strconv"
@@ -30,12 +31,14 @@ func TestConflict(t *testing.T) {
 
 	ch := make(chan int, len(clients))
 	k := time.Now().String()
+	var expecting string
 	for _, client := range clients {
 		go func(client *Client) {
 			err := client.Write([]byte(k), []byte(client.self.Name()))
 			if err != nil {
 				t.Log(err)
 			} else {
+				expecting = client.self.Name()
 				t.Log("Winner: ", client.self.Name())
 			}
 			ch <- 1
@@ -47,9 +50,14 @@ func TestConflict(t *testing.T) {
 
 	c4 := newClient(keyPath + "/u04")
 	c4.Joining()
-	_, err := c4.Read([]byte(k))
+	res, err := c4.Read([]byte(k))
 	if err != nil {
 		t.Log(err)
+	}
+
+	if !bytes.Equal(res, []byte(expecting)) {
+		error := fmt.Sprintf("Expected: %s, Received: %s", expecting, string(res))
+		t.Log(error)
 	}
 }
 
