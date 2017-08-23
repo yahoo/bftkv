@@ -75,7 +75,7 @@ func (c *PGPCertificateInstance) UId() string {
 			return res[1]
 		}
 	}
-	return c.Name()
+	return c.Address()
 }
 
 func (c *PGPCertificateInstance) Signers() []uint64 {

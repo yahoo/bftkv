@@ -193,7 +193,7 @@ func (c *Client) maxTimestampedValue(m map[uint64]map[string][]*signedValue, q q
 	return nil, 0, nil
 }
 
-func (c *Client) processResponse(res *transport.MulticastResponse, m map[uint64]map[string][]*signedValue, q quorum.Quorum) error {
+func (c *Client) processResponse(res *transport.MulticastResponse, m map[uint64]map[string][]*signedValue) error {
 	if res.Err != nil {
 		log.Printf("Read: error from %s: %s\n", res.Peer.Name(), res.Err)
 		return res.Err
@@ -221,8 +221,7 @@ type readResult struct {
 }
 
 func (c *Client) Read(variable []byte) ([]byte, error) {
-	qa := c.qs.ChooseQuorum(quorum.AUTH)
-	qb := c.qs.ChooseQuorum(quorum.READ)
+	q := c.qs.ChooseQuorum(quorum.READ)
 	ch := make(chan(readResult))
 	go func() {
 		m := make(map[uint64]map[string][]*signedValue)
@@ -230,10 +229,10 @@ func (c *Client) Read(variable []byte) ([]byte, error) {
 		maxt := uint64(0)
 		var failure []node.Node
 		var errs []error
-		c.tr.Multicast(transport.Read, qb.Nodes(), variable, func(res *transport.MulticastResponse) bool {
-			if err := c.processResponse(res, m, qa); err == nil {
+		c.tr.Multicast(transport.Read, q.Nodes(), variable, func(res *transport.MulticastResponse) bool {
+			if err := c.processResponse(res, m); err == nil {
 				if ch != nil {
-					value, maxt, err = c.maxTimestampedValue(m, qb)
+					value, maxt, err = c.maxTimestampedValue(m, q)
 					if err == nil || err != errInProgress {
 						ch <- readResult{value, err}
 						ch = nil
@@ -242,7 +241,7 @@ func (c *Client) Read(variable []byte) ([]byte, error) {
 			} else {
 				failure = append(failure, res.Peer)
 				errs = append(errs, err)
-				if ch != nil && qb.Reject(failure) {
+				if ch != nil && q.Reject(failure) {
 					ch <- readResult{nil, majorityError(errs, bftkv.ErrInsufficientNumberOfValidResponses)}
 					ch = nil
 				}
@@ -254,7 +253,7 @@ func (c *Client) Read(variable []byte) ([]byte, error) {
 		}
 		c.revoke(m)
 		if value != nil && len(value) > 0 {	// @@ how can we distinguish nil (no variable) from an empty value?
-			c.writeBack(qb.Nodes(), m, value, maxt)
+			c.writeBack(q.Nodes(), m, value, maxt)
 		}
 	}()
 	res := <- ch

@@ -144,12 +144,11 @@ func (q *wotq) IsQuorum(nodes []node.Node) bool {
 }
 
 func (q *wotq) IsThreshold(nodes []node.Node) bool {
-	// |nodes| >= 2f+1
 	if len(q.qcs) == 0 {
 		return false
 	}
 	for _, qc := range q.qcs {
-		if qc.f > 0 && len(intersection(nodes, qc.nodes)) < qc.threshold {
+		if qc.threshold > 0 && len(intersection(nodes, qc.nodes)) < qc.threshold {
 			return false
 		}
 	}

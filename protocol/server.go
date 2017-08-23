@@ -264,7 +264,8 @@ func (s *Server) write(req []byte, peer node.Node) ([]byte, error) {
 			return nil, bftkv.ErrEquivocation
 		}
 
-		// check the TOFU policy -- check if the signers are same or the new signer is trusted by a quorum
+		// check the TOFU policy -- check if the signers are same
+		// the signature and quorum cert have already been verified 
 		newIssuer := s.crypt.Signature.Issuer(sig)
 		prevIssuer := s.crypt.Signature.Issuer(rsig)
 		if newIssuer == nil || prevIssuer == nil {
@@ -273,7 +274,6 @@ func (s *Server) write(req []byte, peer node.Node) ([]byte, error) {
 		if prevIssuer.Id() != newIssuer.Id() && prevIssuer.UId() != newIssuer.UId() {
 			return nil, bftkv.ErrPermissionDenied
 		}
-
 	}
 
 	if err := s.st.Write(variable, t, req); err != nil {
@@ -294,9 +294,11 @@ func (s *Server) revokeSigners(signers1, signers2 []node.Node) bool {
 			revoked = true
 		}
 	}
-	var buf bytes.Buffer
-	if s.self.SerializeRevokedNodes(&buf) != nil {
-		s.tr.Multicast(transport.Notify, s.self.GetPeers(), buf.Bytes(), nil)
+	if revoked {
+		var buf bytes.Buffer
+		if s.self.SerializeRevokedNodes(&buf) != nil {
+			s.tr.Multicast(transport.Notify, s.self.GetPeers(), buf.Bytes(), nil)
+		}
 	}
 	return revoked
 }
