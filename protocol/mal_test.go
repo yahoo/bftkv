@@ -48,6 +48,7 @@ func TestMaliciousCollusion(t *testing.T) {
 	// create a client
 	c := newClient(keyPath+"/"+clientKey)
 	c.Joining()
+	defer c.Leaving()
 
 	key := []byte(testKey)
 	value := []byte("honesttestvalue")
@@ -84,7 +85,7 @@ func TestTOFU(t *testing.T) {
 	servers = runServers(t, "a", "rw")
 	c2 := newClient(keyPath+"/u02")
 	c2.Joining()
-	c2.checkTofu(uts, t, "untrusted entity overwrite successful - expected error")
+	c2.checkTofu(uts, t, "trusted entity overwrite successful (same UId)")
 	stopServers(servers)
 
 	// exp: permission denied --- diff servers will sign for c01 than u1
