@@ -37,7 +37,7 @@ func MalStorageNew(path string) MalStorage {
 
 func (p *malPlain) getMalMaxT(fname string) (uint64, error) {
 	p.mutex.Lock()
-	stats, err := ioutil.ReadDir(p.path)
+	stats, err := ioutil.ReadDir(p.path + "/mal")
 	p.mutex.Unlock()
 	if err != nil {
 		return 0, err
