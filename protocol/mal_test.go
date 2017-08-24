@@ -18,10 +18,14 @@ import (
 	transport_http "github.com/yahoo/bftkv/transport/http"
 )
 
+var _ = fmt.Println
+
 func TestMaliciousCollusion(t *testing.T) {
 	// malicious client writes <x, t, v> and <x, t, v'> to colluding servers
 	// read is attempted for key x => insufficient responses expected
-	mal = []string{"http://localhost:5705", "http://localhost:5708", "http://localhost:5709", "http://localhost:5706", "http://localhost:5707", "http://localhost:5602", "http://localhost:5603", "http://localhost:5604"}
+	sMal = []string{"http://localhost:5705", "http://localhost:5708", "http://localhost:5709", "http://localhost:5706", "http://localhost:5707", "http://localhost:5704", "http://localhost:5703"}
+	rwMal = []string{"http://localhost:5602", "http://localhost:5603", "http://localhost:5604", "http://localhost:5605", "http://localhost:5606", "http://localhost:5607", "http://localhost:5608"}
+	mal = append(sMal, rwMal...) // used in malserver_test.go
 	files, err := ioutil.ReadDir(keyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +50,7 @@ func TestMaliciousCollusion(t *testing.T) {
 	}()
 
 	// create a client
-	c := newClient(keyPath+"/"+clientKey)
+	c := newClient(keyPath + "/" + clientKey)
 	c.Joining()
 	defer c.Leaving()
 
@@ -75,7 +79,7 @@ func TestTOFU(t *testing.T) {
 	// exp: successful --- the client will write <x, t, v> for the first time
 	// exp: successful --- the client will wrtie <x, t', v'>
 	servers := runServers(t, "a", "rw")
-	c1 := newClient(keyPath+"/u01")
+	c1 := newClient(keyPath + "/u01")
 	c1.Joining()
 	defer c1.Leaving()
 	c1.checkTofu(uts, t, "original write successful")
@@ -84,7 +88,7 @@ func TestTOFU(t *testing.T) {
 
 	// exp: permission denied --- diff user id
 	servers = runServers(t, "a", "rw")
-	c2 := newClient(keyPath+"/u02")
+	c2 := newClient(keyPath + "/u02")
 	c2.Joining()
 	defer c2.Leaving()
 	c2.checkTofu(uts, t, "trusted entity overwrite successful (same UId)")
@@ -92,7 +96,7 @@ func TestTOFU(t *testing.T) {
 
 	// exp: permission denied --- diff servers will sign for c01 than u1
 	servers = runServers(t, "a", "rw")
-	c3 := newClient(keyPath+"/u04")
+	c3 := newClient(keyPath + "/u04")
 	c3.Joining()
 	defer c3.Leaving()
 	c3.checkTofu(uts, t, "untrusted entity overwrite successful - expected error")

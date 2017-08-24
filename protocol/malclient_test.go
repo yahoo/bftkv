@@ -17,6 +17,8 @@ import (
 	"github.com/yahoo/bftkv/transport"
 )
 
+var sMal []string
+var rwMal []string
 var mal []string
 
 type nodeGroup struct {
@@ -25,31 +27,40 @@ type nodeGroup struct {
 	mal_nodes []node.Node
 }
 
-func getCliques(g *graph.Graph) []node.Node {
+func getCliques(g *graph.Graph) ([]node.Node, []node.Node) {
 	cliques := g.GetCliques(g.GetSelfId(), -1)
 	// choose cliques that have only sufficient number of nodes
-	var nodes []node.Node
+	var signers []node.Node
+	var rw []node.Node
 	for _, clique := range cliques {
 		n := len(clique.Nodes)
 		if n == 0 {
 			continue
 		}
-		for _, i := range clique.Nodes {
-			nodes = append(nodes, i)
+		if len(clique.Nodes) > 1 {
+			for _, i := range clique.Nodes {
+				signers = append(signers, i)
+			}
+		} else {
+			rw = append(rw, clique.Nodes[0])
 		}
 	}
-	return nodes
+	return signers, rw
 }
 
-func (c *Client) getNodeGroup() nodeGroup {
+func (c *Client) getNodeGroups() (nodeGroup, nodeGroup) {
 	// the following block splits up each clique into two different groups
 	// and isolates the malicious nodes further
-	all := getCliques(c.self.(*graph.Graph))
+	s, rw := getCliques(c.self.(*graph.Graph))
+	return getGroup(s, sMal), getGroup(rw, rwMal)
+}
+
+func getGroup(nodes []node.Node, mal_array []string) nodeGroup {
 	var group nodeGroup
 	ctr := true
-	for _, client := range all {
+	for _, client := range nodes {
 		flag := true
-		for _, malicious := range mal {
+		for _, malicious := range mal_array {
 			if strings.Compare(malicious, client.Address()) == 0 {
 				group.mal_nodes = append(group.mal_nodes, client)
 				flag = false
@@ -74,10 +85,11 @@ func (c *Client) WriteMal(variable []byte, value []byte) error {
 	// note colluding servers (mal) defined in mal_test.go
 	quorum := c.qs.ChooseQuorum(quorum.AUTH)
 	maxt := uint64(0)
-	group := c.getNodeGroup()
-
-	group_a := append(group.honest1, group.mal_nodes...)
-	group_b := append(group.honest2, group.mal_nodes...)
+	s, rw := c.getNodeGroups()
+	group_a := append(s.honest1, s.mal_nodes...)
+	group_b := append(s.honest2, s.mal_nodes...)
+	group_c := append(rw.honest1, rw.mal_nodes...)
+	group_d := append(rw.honest2, rw.mal_nodes...)
 
 	var actives, failure []node.Node
 	c.tr.Multicast(transport.Time, quorum.Nodes(), variable, func(res *transport.MulticastResponse) bool {
@@ -102,11 +114,11 @@ func (c *Client) WriteMal(variable []byte, value []byte) error {
 	}
 	maxt++
 
-	err1 := c.signAndWrite(group_a, value, variable, maxt, quorum)
+	err1 := c.signAndWrite(group_a, group_c, value, variable, maxt, quorum)
 	if err1 != nil {
 		return err1
 	}
-	err2 := c.signAndWrite(group_b, []byte("second value"), variable, maxt, quorum)
+	err2 := c.signAndWrite(group_b, group_d, []byte("second value"), variable, maxt, quorum)
 	if err2 != nil {
 		return err2
 	}
@@ -114,9 +126,12 @@ func (c *Client) WriteMal(variable []byte, value []byte) error {
 	return nil
 }
 
-func (c *Client) signAndWrite(group []node.Node, value []byte, variable []byte, maxt uint64, quorum quorum.Quorum) error {
-	curr_q := make([]node.Node, len(group))
-	copy(curr_q, group)
+func (c *Client) signAndWrite(s_group []node.Node, rw_group []node.Node, value []byte, variable []byte, maxt uint64, quorum quorum.Quorum) error {
+	s := make([]node.Node, len(s_group))
+	copy(s, s_group)
+
+	rw := make([]node.Node, len(rw_group))
+	copy(rw, rw_group)
 
 	fmt.Println("Client: WriteMal - writing: ", string(value))
 
@@ -133,7 +148,6 @@ func (c *Client) signAndWrite(group []node.Node, value []byte, variable []byte, 
 	if err != nil {
 		return err
 	}
-
 	ss, err := c.crypt.CollectiveSignature.Sign(tbss) // the first one is self-signed
 	if err != nil {
 		return err
@@ -142,9 +156,10 @@ func (c *Client) signAndWrite(group []node.Node, value []byte, variable []byte, 
 	if err != nil {
 		return err
 	}
+
 	var failure []node.Node
 	var errs []error
-	c.tr.Multicast(transport.Sign, curr_q, pkt, func(res *transport.MulticastResponse) bool {
+	c.tr.Multicast(transport.Sign, s, pkt, func(res *transport.MulticastResponse) bool {
 		if res.Err == nil {
 			s, err := packet.ParseSignature(res.Data)
 			if err == nil {
@@ -166,7 +181,7 @@ func (c *Client) signAndWrite(group []node.Node, value []byte, variable []byte, 
 		return err
 	}
 
-	c.tr.Multicast(transport.Write, curr_q, pkt, func(res *transport.MulticastResponse) bool {
+	c.tr.Multicast(transport.Write, rw, pkt, func(res *transport.MulticastResponse) bool {
 		return false
 	})
 
