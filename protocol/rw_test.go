@@ -50,6 +50,7 @@ func TestConflict(t *testing.T) {
 
 	c4 := newClient(keyPath + "/u04")
 	c4.Joining()
+	defer c4.Leaving()
 	res, err := c4.Read([]byte(k))
 	if err != nil {
 		t.Log(err)
@@ -67,6 +68,7 @@ func TestManyWrites(t *testing.T) {
 	defer stopServers(servers)
 	c := newClient(keyPath + "/u01")
 	c.Joining()
+	defer c.Leaving()
 	start := time.Now()
 	for n := 0; n < rounds; n++ {
 		err := c.Write([]byte("abc"), []byte("def"))
@@ -84,6 +86,7 @@ func TestManyReads(t *testing.T) {
 	defer stopServers(servers)
 	c := newClient(keyPath + "/u01")
 	c.Joining()
+	defer c.Leaving()
 	err := c.Write([]byte("ghi"), []byte("jkl"))
 	if err != nil {
 		t.Log(err)
@@ -105,6 +108,7 @@ func TestManyClientsConcurrentReads(t *testing.T) {
 	defer stopServers(servers)
 	c1 := newClient(keyPath + "/u01")
 	c1.Joining()
+	defer c1.Leaving()
 	err := c1.Write([]byte("mno"), []byte("pqr"))
 	if err != nil {
 		t.Log(err)
@@ -131,6 +135,7 @@ func startManyClients(c_paths []string, clients *[]*Client) {
 	for _, c_path := range c_paths {
 		c := newClient(keyPath + "/" + c_path)
 		c.Joining()
+		defer c.Leaving()
 		*clients = append(*clients, c)
 	}
 }

@@ -77,6 +77,7 @@ func TestTOFU(t *testing.T) {
 	servers := runServers(t, "a", "rw")
 	c1 := newClient(keyPath+"/u01")
 	c1.Joining()
+	defer c1.Leaving()
 	c1.checkTofu(uts, t, "original write successful")
 	c1.checkTofu(uts, t, "self overwrite successful")
 	stopServers(servers)
@@ -85,6 +86,7 @@ func TestTOFU(t *testing.T) {
 	servers = runServers(t, "a", "rw")
 	c2 := newClient(keyPath+"/u02")
 	c2.Joining()
+	defer c2.Leaving()
 	c2.checkTofu(uts, t, "trusted entity overwrite successful (same UId)")
 	stopServers(servers)
 
@@ -92,6 +94,7 @@ func TestTOFU(t *testing.T) {
 	servers = runServers(t, "a", "rw")
 	c3 := newClient(keyPath+"/u04")
 	c3.Joining()
+	defer c3.Leaving()
 	c3.checkTofu(uts, t, "untrusted entity overwrite successful - expected error")
 	stopServers(servers)
 }
