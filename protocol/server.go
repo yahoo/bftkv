@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"net/url"
+	"math"
 	"log"
 
 	"github.com/yahoo/bftkv"
@@ -23,8 +24,6 @@ type Server struct {
 	Protocol
 	st storage.Storage
 }
-
-const maxTimestampDiff = 100	// to avoid to intentionally cause overflow
 
 func NewServer(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Transport, crypt *crypto.Crypto, st storage.Storage) *Server {
 	return &Server{
@@ -191,8 +190,9 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 		}
 
 		// make sure that it does not sign both <x, v, t> and <x, v', t>
-		d := t - rt
-		if d == 0 && !bytes.Equal(val, rval) {
+		if rt == math.MaxUint64 {
+			return nil, bftkv.ErrNoMoreWrite
+		} else if t == rt && !bytes.Equal(val, rval) {
 			// revoke the issuers if they are the same
 			if s.revokeSigners(s.crypt.CollectiveSignature.Signers(ss), s.crypt.CollectiveSignature.Signers(rss)) {
 				// @@ should remove <x, v, t> from the storage as well?
@@ -200,8 +200,8 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 			} else {
 				return nil, bftkv.ErrInvalidSignRequest	// someone beat me
 			}
-		} else if d < 0 || d >= maxTimestampDiff {
-			return nil, bftkv.ErrInvalidSignRequest
+		} else if t < rt {
+			return nil, bftkv.ErrBadTimestamp
 		}
 	}
 
@@ -254,7 +254,10 @@ func (s *Server) write(req []byte, peer node.Node) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if t < rt || t - rt >= maxTimestampDiff {
+
+		if rt == math.MaxUint64 {
+			return nil, bftkv.ErrNoMoreWrite
+		} else if t < rt {
 			return nil, bftkv.ErrBadTimestamp
 		} else if t == rt && !bytes.Equal(val, rval) {
 			if rss != nil {

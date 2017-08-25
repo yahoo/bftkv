@@ -227,6 +227,8 @@ func (s *apiService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.bftClient.Leaving()
 		}
 	case "write":
+		fallthrough
+	case "writeonce":
 		body, err2 := ioutil.ReadAll(r.Body)
 		if err2 != nil {
 			http.Error(w, err2.Error(), http.StatusInternalServerError)
@@ -235,7 +237,11 @@ func (s *apiService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Body.Close()
 		err = s.bftClient.Joining()
 		if err == nil {
-			err = s.bftClient.Write([]byte(a[2]), body)
+			if a[1] == "writeonce" {
+				err = s.bftClient.WriteOnce([]byte(a[2]), body)
+			} else {
+				err = s.bftClient.Write([]byte(a[2]), body)
+			}
 			s.bftClient.Leaving()
 		}
 	case "joining":

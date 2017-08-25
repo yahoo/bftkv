@@ -79,8 +79,14 @@ func (c *Client) Write(variable []byte, value []byte) error {
 	if maxt == math.MaxUint64 {
 		return bftkv.ErrInvalidTimestamp
 	}
-	maxt++
+	return c.writeWithTimestamp(variable, value, maxt + 1)
+}
 
+func (c *Client) WriteOnce(variable []byte, value []byte) error {
+	return c.writeWithTimestamp(variable, value, math.MaxUint64)
+}
+
+func (c *Client) writeWithTimestamp(variable []byte, value []byte, t uint64) error {
 	// self-sign over <x, v>
 	tbs, err := packet.Serialize(variable, value)
 	if err != nil {
@@ -90,7 +96,7 @@ func (c *Client) Write(variable []byte, value []byte) error {
 	if err != nil {
 		return err
 	}
-	tbss, err := packet.Serialize(variable, value, sig, maxt)
+	tbss, err := packet.Serialize(variable, value, sig, t)
 	if err != nil {
 		return err
 	}
@@ -100,12 +106,12 @@ func (c *Client) Write(variable []byte, value []byte) error {
 	if err != nil {
 		return err
 	}
-	pkt, err := packet.Serialize(variable, value, sig, maxt, ss)
+	pkt, err := packet.Serialize(variable, value, sig, t, ss)
 	if err != nil {
 		return err
 	}
 	qa := c.qs.ChooseQuorum(quorum.AUTH)
-	failure = nil
+	var failure []node.Node
 	var errs []error
 	c.tr.Multicast(transport.Sign, c.PeerNodes(qa.Nodes()), pkt, func(res *transport.MulticastResponse) bool {
 		if res.Err == nil {
@@ -126,7 +132,7 @@ func (c *Client) Write(variable []byte, value []byte) error {
 
 	// write signed value to another quorum
 	qw := c.qs.ChooseQuorum(quorum.WRITE)
-	pkt, err = packet.Serialize(variable, value, sig, maxt, ss)
+	pkt, err = packet.Serialize(variable, value, sig, t, ss)
 	if err != nil {
 		return err
 	}

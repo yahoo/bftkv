@@ -20,4 +20,5 @@ var (
 	ErrInvalidVariable = errors.New("invalid variable")
 	ErrUnknownCommand = errors.New("unknown command")
 	ErrMalformedRequest = errors.New("malformed request")
+	ErrNoMoreWrite = errors.New("no more write")
 )
