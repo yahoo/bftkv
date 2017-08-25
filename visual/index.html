@@ -56,6 +56,8 @@
 
     </script>
     <script>
+        // var hostName = "ec2-52-33-104-131.us-west-2.compute.amazonaws.com"
+        var hostName = "localhost"
         var NUM_SERVERS = 40;
         var PORT_START = 5001;
         var serverSelect = document.getElementById("servers");
@@ -67,7 +69,7 @@
         
         function updateGraphServer() {
             document.cookie = "server=" + serverSelect.value;
-            var socket = getSocketFromURL("ws://localhost:" + serverSelect.value + "/" + serverSelect.value);
+            var socket = getSocketFromURL("ws://" + hostName + ":" + serverSelect.value + "/" + serverSelect.value);
             socket.send(JSON.stringify({message: "graph"}))
         }
 
@@ -81,7 +83,7 @@
         var colorNodeQ = [];
         for (var i = 0; i < NUM_SERVERS; i++) {
             var currPort = (PORT_START + i);
-            var ws = new WebSocket("ws://localhost:" + currPort + "/" + currPort);
+            var ws = new WebSocket("ws://" + hostName + ":" + currPort + "/" + currPort);
             sockets[i] = ws; 
             sockets[i].onopen = function () {
                 console.log("Socket opened to " + this.url);
@@ -278,16 +280,16 @@
         }
 
         document.getElementById("readButton").addEventListener("click", function(){
-            var apiAddr = "localhost:6001"; // document.getElementById("readAPIServerAddress").value; 
+            var apiAddr = hostName + ":6001"; // document.getElementById("readAPIServerAddress").value; 
             var key = document.getElementById("readKey").value; 
             httpGetAsync("http://" + apiAddr + "/read/" + key, "");
         });
 
         document.getElementById("writeButton").addEventListener("click", function(){
             console.log("Clicked on write button");
-            var apiAddr = "localhost:6002"; // document.getElementById("writeAPIServerAddress").value; 
+            var apiAddr = hostName + ":6002"; // document.getElementById("writeAPIServerAddress").value; 
             if (writeType == "writemal") {
-                apiAddr = "localhost:6003"; 
+                apiAddr = hostName + ":6003"; 
             }
             var key = document.getElementById("writeKey").value; 
             var value = document.getElementById("writeValue").value; 

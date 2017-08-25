@@ -33,7 +33,7 @@ for key in keys/{u*,a*,b*,rw*}; do
     if is_failure $GPGHOME; then continue; fi
     DB=db.$GPGHOME
     mkdir -p $DB
-    $AOUT -home $key -api localhost:$API_ADDR -ws $WS_ADDR -db $DB &
+    $AOUT -home $key -api $API_ADDR -ws $WS_ADDR -db $DB &
     JOBS="$JOBS %$i"
     API_ADDR=`expr $API_ADDR + 1`
     if [ $WS_ADDR -ne 0 ]; then WS_ADDR=`expr $WS_ADDR + 1`; fi

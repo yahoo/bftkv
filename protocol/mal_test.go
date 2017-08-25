@@ -85,6 +85,7 @@ func TestTOFU(t *testing.T) {
 	c1.checkTofu(uts, t, "original write successful")
 	c1.checkTofu(uts, t, "self overwrite successful")
 	stopServers(servers)
+	c1.Leaving()
 
 	// exp: permission denied --- diff user id
 	servers = runServers(t, "a", "rw")
@@ -93,6 +94,7 @@ func TestTOFU(t *testing.T) {
 	defer c2.Leaving()
 	c2.checkTofu(uts, t, "trusted entity overwrite successful (same UId)")
 	stopServers(servers)
+	c2.Leaving()
 
 	// exp: permission denied --- diff servers will sign for c01 than u1
 	servers = runServers(t, "a", "rw")
@@ -101,6 +103,7 @@ func TestTOFU(t *testing.T) {
 	defer c3.Leaving()
 	c3.checkTofu(uts, t, "untrusted entity overwrite successful - expected error")
 	stopServers(servers)
+	c3.Leaving()
 }
 
 func runServers(t *testing.T, prefixes ...string) []*Server {

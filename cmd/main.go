@@ -41,7 +41,7 @@ func main() {
 	revocationp := flag.String("rev", "", "revocation list")
 	dbPathp := flag.String("db", "db", "database path")
 	ldbPathp := flag.String("ldb", "", "level db path")
-	apiAddressp := flag.String("api", "localhost:5792", "http api address")
+	apiPortp := flag.Int("api", 0, "http api address")
 	wsPortp := flag.Int("ws", 0, "web socket port")
 
 	flag.Parse()
@@ -98,9 +98,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// start HTTP API
-	apiServer := &apiService{bftClient: bftClient, g: g}
-	apiServer.Start(*apiAddressp)
+	var apiServer *apiService
+	if *apiPortp != 0 {
+		// start HTTP API
+		apiServer = &apiService{bftClient: bftClient, g: g}
+		apiServer.Start(*apiPortp)
+	}
 
 	// wait for a signal
 	ch := make(chan os.Signal, 1)
@@ -108,7 +111,9 @@ func main() {
 	<-ch
 
 	// stop servers
-	apiServer.Stop()
+	if apiServer != nil {
+		apiServer.Stop()
+	}
 	bftServer.Stop()
 	
 	// save pubring and revocation list
@@ -188,9 +193,9 @@ type apiService struct {
 	httpServer *http.Server
 }
 
-func (s *apiService) Start(addr string) {
+func (s *apiService) Start(port int) {
 	s.httpServer = &http.Server{
-		Addr: addr,
+		Addr: ":" + strconv.Itoa(port),
 		Handler: s,
 	}
 	go s.httpServer.ListenAndServe()

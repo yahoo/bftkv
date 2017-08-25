@@ -60,6 +60,7 @@ func TestConflict(t *testing.T) {
 		error := fmt.Sprintf("Expected: %s, Received: %s", expecting, string(res))
 		t.Log(error)
 	}
+	c4.Leaving()
 }
 
 func TestManyWrites(t *testing.T) {
@@ -78,6 +79,7 @@ func TestManyWrites(t *testing.T) {
 	}
 	duration := time.Since(start)
 	fmt.Printf("Avg write: %.6f seconds\n", duration.Seconds()/float64(rounds))
+	c.Leaving()
 }
 
 func TestManyReads(t *testing.T) {
@@ -100,6 +102,7 @@ func TestManyReads(t *testing.T) {
 	}
 	duration := time.Since(start)
 	fmt.Printf("Avg read: %.6f seconds\n", duration.Seconds()/float64(rounds))
+	c.Leaving()
 }
 
 func TestManyClientsConcurrentReads(t *testing.T) {
@@ -129,6 +132,7 @@ func TestManyClientsConcurrentReads(t *testing.T) {
 	for i := 0; i < num_clients; i++ {
 		<-ch
 	}
+	c1.Leaving()
 }
 
 func startManyClients(c_paths []string, clients *[]*Client) {
@@ -162,5 +166,8 @@ func TestManyClientsConcurrentWrites(t *testing.T) {
 	}
 	for i := 0; i < ch_len; i++ {
 		<-ch
+	}
+	for _, c := range clients {
+		c.Leaving()
 	}
 }
