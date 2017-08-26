@@ -6,6 +6,8 @@
 WS_ADDR=5001
 if [ "$1" == "-novisual" ]; then shift; WS_ADDR=0; fi
 
+if [ "$GOPATH" == "" ]; then export GOPATH=~/go; fi
+
 APP=$GOPATH/src/github.com/yahoo/bftkv
 MAIN=$APP/cmd/main.go
 AOUT=./bftkv

@@ -88,6 +88,6 @@ func readCerts(g *graph.Graph, crypt *crypto.Crypto, path string, sec bool) {
 	} else {
 		g.AddNodes(certs)
 	}
-	crypt.Keyring.Register(certs, sec)
+	crypt.Keyring.Register(certs, sec, true)
 	f.Close()
 }

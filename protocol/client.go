@@ -165,38 +165,30 @@ type signedValue struct {
 
 var errInProgress = errors.New("")
 
-func (c *Client) maxTimestampedValue(m map[uint64]map[string][]*signedValue, q quorum.Quorum) ([]byte, uint64, error) {
-	// first, check if we have enough responses
+func isThreshold(l []*signedValue, q quorum.Quorum) bool {
 	var nodes []node.Node
-	for _, vl := range m {
-		for _, l := range vl {
-			for _, sv := range l {
-				nodes = append(nodes, sv.node)
-			}
-		}
+	for _, sv := range l {
+		nodes = append(nodes, sv.node)
 	}
-	if !q.IsThreshold(nodes) {
-		return nil, 0, errInProgress
-	}
+	return q.IsThreshold(nodes)
+}
 
+func (c *Client) maxTimestampedValue(m map[uint64]map[string][]*signedValue, q quorum.Quorum) ([]byte, uint64, error) {
 	// here, we are interested in only the values that have maxt
 	maxt := uint64(0)
 	var maxvl map[string][]*signedValue
 	for t, vl := range m {
-		if t > maxt {
+		if t >= maxt {
 			maxt = t
 			maxvl = vl
 		}
 	}
-	// @@ should we check equivocation for other timestamps here?
-	if len(maxvl) > 1 {
-		return nil, 0, bftkv.ErrEquivocation
-	}
-	for v, _ := range maxvl {
-		// must have only one key (value)
-		return []byte(v), maxt, nil
-	}
-	return nil, 0, nil
+	for v, l := range maxvl {
+		if isThreshold(l, q) {
+			return []byte(v), maxt, nil
+		}
+ 	}
+	return nil, 0, errInProgress
 }
 
 func (c *Client) processResponse(res *transport.MulticastResponse, m map[uint64]map[string][]*signedValue) error {
@@ -204,12 +196,15 @@ func (c *Client) processResponse(res *transport.MulticastResponse, m map[uint64]
 		log.Printf("Read: error from %s: %s\n", res.Peer.Name(), res.Err)
 		return res.Err
 	}
-	if res.Data == nil || len(res.Data) == 0 {
-		return nil
-	}
-	_, val, sig, t, ss, err := packet.Parse(res.Data)
-	if err != nil {
-		return err
+	var val []byte
+	var sig, ss *packet.SignaturePacket
+	var t uint64
+	var err error
+	if res.Data != nil && len(res.Data) > 0 {
+		_, val, sig, t, ss, err = packet.Parse(res.Data)
+		if err != nil {
+			return err
+		}
 	}
 	// collect <t, v>
 	vl, ok := m[t]

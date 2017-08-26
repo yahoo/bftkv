@@ -50,7 +50,7 @@ func newQC(clique graph.Clique, rw int) *qc {
 		min := 3 * f + 1
 		threshold := 2 * f + 1
 		suff := f + (n - f) / 2 + 1
-		if (rw & quorum.CERT) != 0 {
+		if (rw & (quorum.CERT | quorum.READ)) != 0 {
 			threshold = f + 1
 		}
 		if clique.Weight <= n - suff {
