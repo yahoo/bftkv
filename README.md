@@ -14,7 +14,8 @@ BFTKV is a distributed key-value storage which is tolerant to Byzantine fault. S
 1. Install [Go 1.8](https://golang.org/doc/install).
 2. `go get -u github.com/yahoo/bftkv`
 3. Install [GnuPG 2.x](https://www.gnupg.org/download/index.en.html)
-4. Run setup.sh in scripts
+4. Install [Docker](https://www.docker.com) (if you want to run BFTKV in a Docker container)
+5. Run setup.sh in scripts (replace `localhost` with `bftkv` if BFTKV will run in a Docker container)
 
 ## Build
 ```
@@ -36,10 +37,17 @@ A list of parameters that can be supplied to bftkv is given below:
 -ws      Web socket port,                      5001
 </pre>
 
-## Run
-Run a node `bftkv -home gnupg.key`
+## Run Options
+1. Run a node `bftkv -home gnupg.key`
 
-Run a BFTKV cluster `cd scripts; run.sh`
+2. Run a BFTKV cluster `cd scripts; run.sh`
+
+3. Run a BFTKV cluster in Docker
+
+```
+docker build -t bftkv .
+docker run -d bftkv
+```
 
 ## Visualization
 BFTKV includes a visualization tool (located in `visual/`) for observing the current system state. The tool can display
