@@ -17,12 +17,12 @@ gen.sh -port 5801 b01 b02 b03 b04 b05 b06 b07 b08 b09 b10
 clique.sh a*
 clique.sh b*
 
-trust.sh -t signee rw01 a* b*
-trust.sh -t signee rw02 a* b*
-trust.sh -t signee rw03 a* b*
-trust.sh -t signee rw04 a* b*
-trust.sh -t signee rw05 a* b*
-trust.sh -t signee rw06 a* b*
+trust.sh -t signer rw01 a* b*
+trust.sh -t signer rw02 a* b*
+trust.sh -t signer rw03 a* b*
+trust.sh -t signer rw04 a* b*
+trust.sh -t signer rw05 a* b*
+trust.sh -t signer rw06 a* b*
 
 trust.sh -t signer u01 a0[1-6] rw*
 trust.sh -t signer u02 a0[1-6] rw*
