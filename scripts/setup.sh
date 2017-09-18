@@ -5,11 +5,14 @@
 
 CWD=`pwd`
 export PATH=$CWD:$PATH
-mkdir -p run/keys
-cd run/keys
 
 HOST=localhost
 if [ "$1" == "-host" ]; then shift; HOST=$1; shift; fi
+
+WD="$1"
+if [ "$WD" == "" ]; then WD="run"; fi
+mkdir -p $WD/keys
+cd $WD/keys
 
 gen.sh -uid "foo@example.com" u01 u02 u03 u04
 gen.sh -uid "bar@example.com" u11

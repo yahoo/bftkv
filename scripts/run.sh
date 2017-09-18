@@ -12,14 +12,10 @@ APP=$GOPATH/src/github.com/yahoo/bftkv
 MAIN=$APP/cmd/main.go
 AOUT=./bftkv
 
-mkdir -p run
-cd run
-
 go build -o $AOUT $MAIN
 if [ $? -ne 0 ]; then echo "build failed"; exit; fi
 
-FAILURE_NODES=(gnupg.a08 gnupg.b08)
-#FAILURE_NODES=()
+FAILURE_NODES=()
 
 function is_failure {
     for n in ${FAILURE_NODES[@]}; do if [ "$n" == "$1" ]; then return 0; fi; done

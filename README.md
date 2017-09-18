@@ -15,7 +15,7 @@ BFTKV is a distributed key-value storage which is tolerant to Byzantine fault. S
 2. `go get -u github.com/yahoo/bftkv`
 3. Install [GnuPG 2.x](https://www.gnupg.org/download/index.en.html)
 4. Install [Docker](https://www.docker.com) (if you want to run BFTKV in a Docker container)
-5. Run setup.sh in scripts (replace `localhost` with `bftkv` if BFTKV will run in a Docker container)
+5. Run `setup.sh` in scripts (`setup.sh -host bftkv` for Docker. If bftkv runs with KeyTransparency, run `$GOPATH/src/github.com/google/keytranspreancy/scripts/gen_bftkv_keys.sh`)
 
 ## Build
 ```

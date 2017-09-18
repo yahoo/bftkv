@@ -2,9 +2,9 @@ FROM golang
 
 ADD . /go/src/github.com/yahoo/bftkv
 
-WORKDIR /go/src/github.com/yahoo/bftkv/scripts
+WORKDIR /go/src/github.com/yahoo/bftkv/scripts/run_docker
 
-ENTRYPOINT ./run.sh
+ENTRYPOINT ../run.sh
 
 EXPOSE 5601-5606
 EXPOSE 5701-5710
