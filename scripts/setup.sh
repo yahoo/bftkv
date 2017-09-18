@@ -8,11 +8,14 @@ export PATH=$CWD:$PATH
 mkdir -p run/keys
 cd run/keys
 
+HOST=localhost
+if [ "$1" == "-host" ]; then shift; HOST=$1; shift; fi
+
 gen.sh -uid "foo@example.com" u01 u02 u03 u04
 gen.sh -uid "bar@example.com" u11
-gen.sh -port 5601 rw01 rw02 rw03 rw04 rw05 rw06
-gen.sh -port 5701 a01 a02 a03 a04 a05 a06 a07 a08 a09 a10
-gen.sh -port 5801 b01 b02 b03 b04 b05 b06 b07 b08 b09 b10
+gen.sh -url http://$HOST:5601 rw01 rw02 rw03 rw04 rw05 rw06
+gen.sh -url http://$HOST:5701 a01 a02 a03 a04 a05 a06 a07 a08 a09 a10
+gen.sh -url http://$HOST:5801 b01 b02 b03 b04 b05 b06 b07 b08 b09 b10
 
 clique.sh a*
 clique.sh b*
