@@ -14,9 +14,14 @@ import (
 
 var (
 	ErrCertificateNotFound = errors.New("crypto: certifiate not found")
+	ErrKeyNotFound = errors.New("crypto: key not found")
 	ErrInvalidTransportSecurityData = errors.New("crypto: invalid transport security data")
 	ErrInsufficientNumberOfSignatures = errors.New("crypto: insufficient number of signatures")
 	ErrInvalidSignature = errors.New("crypto: invalid signature")
+	ErrSigniningFailed = errors.New("crypto: failed to sign")
+	ErrEncryptionFailed = errors.New("crypto: failed to encrypt")
+	ErrDecryptionFailed = errors.New("crypto: failed to decrypt")
+	ErrInsufficientNumberOfSecrets = errors.New("crypto: insufficient number of secrets")
 )
 
 type Keyring interface {
@@ -55,6 +60,24 @@ type CollectiveSignature interface {
 	Signers(ss *packet.SignaturePacket) []node.Node
 }
 
+type AuthenticationClient interface {
+	GenerateAuthenticationData() ([]byte, error)
+	ProcessAuthResponse(res []byte, id uint64) (bool, error)
+	Decrypt(id uint64, cipher []byte) ([]byte, error)
+	GetCipherKey() []byte
+}
+
+type Authentication interface {
+	GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byte, error)
+	MakeResponse(ss []byte, challenge []byte, plain []byte) (res []byte, cipher []byte, err error)
+	NewClient(cred []byte) AuthenticationClient
+}
+
+type DataEncryption interface {
+	Encrypt(key []byte, plain []byte) ([]byte, error)
+	Decrypt(key []byte, cipher []byte) ([]byte, error)
+}
+
 type RNG interface {
 	Initialize(seed []byte)
 	Generate(n int) []byte
@@ -66,5 +89,7 @@ type Crypto struct {
 	Signature Signature
 	Message Message
 	CollectiveSignature CollectiveSignature
+	DataEncryption DataEncryption
 	RNG RNG
+	Authentication Authentication
 }

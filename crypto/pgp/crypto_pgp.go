@@ -23,6 +23,7 @@ import (
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/packet"
 	"github.com/yahoo/bftkv/quorum"
+	"github.com/yahoo/bftkv/crypto/auth"
 )
 
 
@@ -250,6 +251,21 @@ func (c *PGPCertificate) Signers(signee node.Node) []node.Node {
 	return signers
 }
 
+func (c *PGPCertificate) Sign(signee node.Node) error {
+	signer := c.keyring.GetPrivateKey()
+	if signer == nil {
+		return crypto.ErrKeyNotFound
+	}
+	e := signee.(*PGPCertificateInstance).entity
+	if len(e.Identities) < 1 {
+		return crypto.ErrCertificateNotFound
+	}
+	if e.SignIdentity(e.Identities[0], signer, nil) != nil {
+		return crypto.ErrSigniningFailed
+	}
+	return nil
+}
+
 //
 // Signature
 //
@@ -297,7 +313,7 @@ func (s *PGPSignature) Sign(tbs []byte) (*packet.SignaturePacket, error) {
 	var w bytes.Buffer
 	r := bytes.NewReader(tbs)
 	if err := openpgp.DetachSign(&w, priv, r, nil); err != nil {
-		return nil, err
+		return nil, crypto.ErrSigningFailed
 	}
 	sig := w.Bytes()
 	var w2 bytes.Buffer
@@ -375,7 +391,7 @@ func (msg *PGPMessage) Encrypt(peers []node.Node, plain []byte, nonce []byte) ([
 	w := bufio.NewWriter(&b)
 	plainWriter, err := openpgp.Encrypt(w, to, priv, &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
 	if err != nil {
-		return nil, err
+		return nil, crypto.ErrEncryptionFailed
 	}
 	plainWriter.Write(plain)
 	plainWriter.Close()
@@ -390,13 +406,17 @@ func (msg *PGPMessage) EncryptStream(w io.Writer, peerId uint64, nonce []byte) (
 		return nil, crypto.ErrCertificateNotFound
 	}
 	to := []*openpgp.Entity{e}
-	return openpgp.Encrypt(w, to, priv, &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
+	w, err := openpgp.Encrypt(w, to, priv, &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
+	if err != nil {
+		return nil, crypto.ErrEncryptionFailed
+	}
+	return w, nil
 }
 
 func (msg *PGPMessage) Decrypt(body io.Reader) (plain []byte, nonce []byte, peer node.Node, err error) {
 	m, err := openpgp.ReadMessage(body, msg.keyring.getKeyring(), nil, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, crypto.ErrDecryptionFailed
 	}
 	if !(m.IsEncrypted && m.IsSigned) {	// m.IsSignedBy might be nil in the case we haven't had the signer's key in the keyring yet
 		return nil, nil, nil, crypto.ErrInvalidTransportSecurityData
@@ -457,6 +477,40 @@ func (cs *PGPCollectiveSignature) Signers(ss *packet.SignaturePacket) []node.Nod
 	return cs.signature.Signers(ss)
 }
 
+//
+// data encryption
+//
+
+type DataEncryption struct {
+}
+
+func NewDataEncryption() crypt.DataEncryption {
+	return &DataEncryption{}
+}
+
+func (e *DataEncryption) Encrypt(key []byte, plain []byte) ([]byte, error) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+	pw, err := openpgp.SymmetricallyEncrypt(w, key, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	pw.Write(plain)
+	pw.Close()
+	w.Flush()
+	return b.Bytes(), nil
+}
+
+func (e *DataEncryption) Decrypt(key []byte, cipher []byte) ([]byte, error) {
+	m, err := openpgp.ReadMessage(bytes.NewReader(cipher), nil, func(keys []key, Symmetric bool) ([]byte, error) {
+		return key, nil
+	}, nil)
+	plain, err = ioutil.ReadAll(m.UnverifiedBody)
+	if err != nil {
+		return nil, err
+	}
+	return plain, m.SignatureError
+}
 
 //
 // rng
@@ -492,6 +546,8 @@ func New() *crypto.Crypto {
 	instance.Signature = NewSignature(instance.Keyring, instance.Certificate)
 	instance.Message = NewMessage(instance.Keyring)
 	instance.CollectiveSignature = NewCollectiveSignature(instance.Signature)
+	instance.DataEncryption = NewDataEncryption()
 	instance.RNG = NewRNG()
+	instance.Authentication = auth.NewAuth()
 	return instance
 }
