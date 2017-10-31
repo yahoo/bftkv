@@ -28,7 +28,8 @@ type AuthPartialSecret struct {
 type AuthClient struct {
 	password []byte
 	pi *big.Int
-	a *big.Int
+	a *big.Int	// random exp
+	a2 *big.Int	// a - g^pi
 	ss *big.Int
 	X *big.Int
 	results map[uint64]*AuthPartialSecret
@@ -103,7 +104,7 @@ func NewAuth() crypto.Authentication {
 }
 
 func (a *Auth) GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byte, error) {
-	// generate a k-degree polynomial (on q)
+	// generate a (k-1)-degree polynomial (on q)
 	poly := make([]*big.Int, k)
 	for i := 0; i < k; i++ {
 		coeff, err := rand.Int(rand.Reader, q)
@@ -119,7 +120,6 @@ func (a *Auth) GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byt
 		return nil, err
 	}
 	pi := PI(cred, salt)
-	gpi := new(big.Int).Exp(g, pi, q)
 
 	// x = pi * g^s, v = g^x
 	x := new(big.Int)
@@ -129,6 +129,7 @@ func (a *Auth) GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byt
 
 	var res [][]byte
 	t := new(big.Int)
+	gpi := new(big.Int).Exp(g, PI(cred, nil), q)	// salt = nil
 	for i := 1; i <= n; i++ {
 		x := big.NewInt(int64(i))
 		f := new(big.Int).Set(poly[0])
@@ -139,7 +140,7 @@ func (a *Auth) GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byt
 		}
 		var params AuthParams
 		params.x = i
-		params.y = new(big.Int).Mod(t.Add(f, gpi), q)
+		params.y = new(big.Int).Mod(t.Add(f, gpi), q)	// f(i) + g^pi
 		params.v = v
 		params.salt = salt
 		params.n = n
@@ -176,8 +177,8 @@ func (a *Auth) MakeResponse(ss []byte, challenge []byte, plain []byte) (res []by
 	t.Exp(t.Mod(t.Mul(X, t.Exp(params.v, u, p)), p), b, p)
 	ks := t.Bytes()
 
-	// Yi = X^y
-	Yi := new(big.Int).Exp(X, params.y, p)
+	// Yi = X*g^y
+	Yi := new(big.Int).Mod(new(big.Int).Mul(X, new(big.Int).Exp(g, params.y, p)), p)	// g^(a+fi)
 
 	// encrypt the data with ks
 	block, err := aes.NewCipher(hash(ks))
@@ -205,8 +206,12 @@ func (c *AuthClient) GenerateAuthenticationData() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	gpi := new(big.Int).Exp(g, PI(c.password, nil), q)	// salt = nil
 	c.a = a
-	c.X = new(big.Int).Exp(g, a, p)
+	t := new(big.Int).Sub(a, gpi)
+	t.Mod(t, q)
+	c.a2 = t
+	c.X = new(big.Int).Exp(g, t, p)		// g^(a - g^pi)
 	return c.X.Bytes(), nil
 }
 
@@ -217,13 +222,9 @@ func (c *AuthClient) ProcessAuthResponse(res []byte, id uint64) (bool, error) {
 	}
 
 	c.pi = PI(c.password, salt)
-	gpi := new(big.Int).Exp(g, c.pi, q)
-
-	inv := new(big.Int).ModInverse(c.a, q)		// t = a^-1 mod q
-	gy := new(big.Int).Exp(Yi, inv, p)		// Yi^t = g^y mod p
-
-	gpii := new(big.Int).Exp(g, new(big.Int).Sub(q, gpi), p)		// g^(-g^pi)
-	gy.Mod(gy.Mul(gy, gpii), p)			// g^y * g^(-g^pi) = g^(y-g^pi) = g^f(i)
+	inv := new(big.Int).Sub(q, c.a)		// t = -a mod q
+	gy := new(big.Int).Mul(Yi, new(big.Int).Exp(g, inv, p))		// Yi*t = g^(a+f(i))*g^-a = g^f(i)
+	gy.Mod(gy, p)
 
 	c.results[id] = &AuthPartialSecret{x, gy, Bi}
 	if len(c.results) == k {	// k: take the lastest one
@@ -265,7 +266,7 @@ func (c *AuthClient) getSessionKey(id uint64) ([]byte, error) {
 	t := new(big.Int)
 	e := new(big.Int)
 	t.Mod(t.Sub(Bi, t.Mod(t.Mul(k, t.Exp(g, x, p)), p)), p)	// Bi - kg^x
-	e.Mod(e.Add(c.a, e.Mod(e.Mul(u, x), phi)), phi)	// e=a+ux
+	e.Mod(e.Add(c.a2, e.Mod(e.Mul(u, x), phi)), phi)	// e=a+ux
 	return new(big.Int).Exp(t, e, p).Bytes(), nil		// ks = (Bi - kg^x)^e
 }
 
@@ -308,10 +309,6 @@ func (c *AuthClient) lagrange(x int) *big.Int {
 		b.Mul(b, new(big.Int).Sub(xm, xj))
 	}
 	a.Mod(a.Mul(a, b.ModInverse(b, q)), q)
-	zero := new(big.Int)
-	if zero.Cmp(a) > 0 {	// negative
-		a.Add(a, q)
-	}
 	return a
 }
 
