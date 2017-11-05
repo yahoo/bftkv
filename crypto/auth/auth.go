@@ -23,6 +23,7 @@ type AuthPartialSecret struct {
 	x int
 	y *big.Int
 	B *big.Int
+	aux []byte
 }
 
 type AuthClient struct {
@@ -30,9 +31,10 @@ type AuthClient struct {
 	pi *big.Int
 	a *big.Int	// random exp
 	a2 *big.Int	// a - g^pi
-	ss *big.Int
+	ss *big.Int	// shared secret g^S (S=a[0])
 	X *big.Int
 	results map[uint64]*AuthPartialSecret
+	k, n int
 }
 
 type AuthParams struct {
@@ -40,7 +42,6 @@ type AuthParams struct {
 	y *big.Int
 	v *big.Int
 	salt []byte
-	k, n int
 }
 
 const SALT_SIZE = 16
@@ -103,7 +104,7 @@ func NewAuth() crypto.Authentication {
 	return &Auth{}
 }
 
-func (a *Auth) GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byte, error) {
+func (a *Auth) GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error) {
 	// generate a (k-1)-degree polynomial (on q)
 	poly := make([]*big.Int, k)
 	for i := 0; i < k; i++ {
@@ -131,20 +132,18 @@ func (a *Auth) GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byt
 	t := new(big.Int)
 	gpi := new(big.Int).Exp(g, PI(cred, nil), q)	// salt = nil
 	for i := 1; i <= n; i++ {
-		x := big.NewInt(int64(i))
+		x0 := big.NewInt(int64(i))
+		x := new(big.Int).Set(x0)
 		f := new(big.Int).Set(poly[0])
 		for j := 1; j < k; j++ {
-			f.Add(f, t.Mul(poly[j], x))
-			f.Mod(f, q)
-			x.Mul(x, x)
+			f.Mod(f.Add(f, t.Mul(poly[j], x)), q)
+			x.Mul(x, x0)
 		}
 		var params AuthParams
 		params.x = i
 		params.y = new(big.Int).Mod(t.Add(f, gpi), q)	// f(i) + g^pi
 		params.v = v
 		params.salt = salt
-		params.n = n
-		params.k = k
 		ss, err := serializeParams(&params)
 		if err != nil {
 			return nil, err
@@ -154,14 +153,14 @@ func (a *Auth) GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byt
 	return res, nil
 }
 
-func (a *Auth) MakeResponse(ss []byte, challenge []byte, plain []byte) (res []byte, cipherData []byte, err error) {
+func (a *Auth) MakeResponse(ss []byte, challenge []byte, plain []byte) (res []byte, err error) {
 	params, err := parseParams(ss)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	b, err := rand.Int(rand.Reader, p)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Bi = kv + g^b
@@ -183,21 +182,22 @@ func (a *Auth) MakeResponse(ss []byte, challenge []byte, plain []byte) (res []by
 	// encrypt the data with ks
 	block, err := aes.NewCipher(hash(ks))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	aead, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	cipherData = aead.Seal(nil, genNonce(aead.NonceSize()), plain, append(X.Bytes(), Bi.Bytes()...))
-	res, err = serializeResponse(Yi, params.x, Bi, params.salt, params.k)
-	return
+	cipherData := aead.Seal(nil, genNonce(aead.NonceSize()), plain, append(X.Bytes(), Bi.Bytes()...))
+	return serializeResponse(Yi, params.x, Bi, params.salt, cipherData)
 }
 
-func (a *Auth) NewClient(cred []byte) crypto.AuthenticationClient {
+func (a *Auth) NewClient(cred []byte, n, k int) crypto.AuthenticationClient {
 	return &AuthClient{
 		password: cred,
 		results: make(map[uint64]*AuthPartialSecret),
+		k: k,
+		n: n,
 	}
 }
 
@@ -216,7 +216,7 @@ func (c *AuthClient) GenerateAuthenticationData() ([]byte, error) {
 }
 
 func (c *AuthClient) ProcessAuthResponse(res []byte, id uint64) (bool, error) {
-	Yi, x, Bi, salt, k, err := parseResponse(res)
+	Yi, x, Bi, salt, aux, err := parseResponse(res)
 	if err != nil {
 		return false, nil
 	}
@@ -226,12 +226,41 @@ func (c *AuthClient) ProcessAuthResponse(res []byte, id uint64) (bool, error) {
 	gy := new(big.Int).Mul(Yi, new(big.Int).Exp(g, inv, p))		// Yi*t = g^(a+f(i))*g^-a = g^f(i)
 	gy.Mod(gy, p)
 
-	c.results[id] = &AuthPartialSecret{x, gy, Bi}
-	if len(c.results) == k {	// k: take the lastest one
+	c.results[id] = &AuthPartialSecret{x, gy, Bi, aux}
+	if len(c.results) == c.k {
 		c.ss = c.calculateSharedSecret()
-		return true, nil
 	}
-	return false, nil
+	return c.ss != nil, nil
+}
+
+func (c *AuthClient) GetAuxData(id uint64) ([]byte, error) {
+	ks, err := c.getSessionKey(id)
+	if err != nil {
+		return nil, err
+	}
+	block, err := aes.NewCipher(hash(ks))
+	if err != nil {
+		return nil, err
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	res := c.results[id]
+	Bi := res.B
+	plain, err := aead.Open(nil, genNonce(aead.NonceSize()), res.aux, append(c.X.Bytes(), Bi.Bytes()...))
+	if err != nil {
+		return nil, crypto.ErrDecryptionFailed
+	}
+	return plain, err
+}
+
+func (c *AuthClient) GetCipherKey() ([]byte, error) {
+	if c.ss == nil || c.pi == nil {
+		return nil, crypto.ErrInsufficientNumberOfSecrets
+	}
+	t := new(big.Int)
+	return hash(t.Mod(t.Mul(c.pi, c.ss), p).Bytes()), nil
 }
 
 func (c *AuthClient) calculateSharedSecret() *big.Int {
@@ -246,7 +275,7 @@ func (c *AuthClient) calculateSharedSecret() *big.Int {
 }
 
 func (c *AuthClient) getSessionKey(id uint64) ([]byte, error) {
-	if c.ss == nil {
+	if c.ss == nil || c.pi == nil {
 		return nil, crypto.ErrInsufficientNumberOfSecrets
 	}
 	result, ok := c.results[id]
@@ -270,32 +299,6 @@ func (c *AuthClient) getSessionKey(id uint64) ([]byte, error) {
 	return new(big.Int).Exp(t, e, p).Bytes(), nil		// ks = (Bi - kg^x)^e
 }
 
-func (c *AuthClient) Decrypt(id uint64, cipherData []byte) ([]byte, error) {
-	ks, err := c.getSessionKey(id)
-	if err != nil {
-		return nil, err
-	}
-	block, err := aes.NewCipher(hash(ks))
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	Bi := c.results[id].B
-	plain, err := aead.Open(nil, genNonce(aead.NonceSize()), cipherData, append(c.X.Bytes(), Bi.Bytes()...))
-	if err != nil {
-		return nil, crypto.ErrDecryptionFailed
-	}
-	return plain, err
-}
-
-func (c *AuthClient) GetCipherKey() []byte {
-	t := new(big.Int)
-	return hash(t.Mod(t.Mul(c.pi, c.ss), p).Bytes())
-}
-
 func (c *AuthClient) lagrange(x int) *big.Int {
 	a := big.NewInt(1)
 	b := big.NewInt(1)
@@ -306,7 +309,7 @@ func (c *AuthClient) lagrange(x int) *big.Int {
 		}
 		xm := big.NewInt(int64(res.x))
 		a.Mul(a, xm)
-		b.Mul(b, new(big.Int).Sub(xm, xj))
+		b.Mul(b, xm.Sub(xm, xj))
 	}
 	a.Mod(a.Mul(a, b.ModInverse(b, q)), q)
 	return a
@@ -360,12 +363,6 @@ func serializeParams(params *AuthParams) ([]byte, error) {
 	if err := packet.WriteChunk(buf, params.salt); err != nil {
 		return nil, err
 	}
-	if err := binary.Write(buf, binary.BigEndian, int32(params.k)); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(buf, binary.BigEndian, int32(params.n)); err != nil {
-		return nil, err
-	}
 	return buf.Bytes(), nil
 }
 
@@ -387,18 +384,10 @@ func parseParams(ss []byte) (*AuthParams, error) {
 	if params.salt, err = packet.ReadChunk(r); err != nil {
 		return nil, err
 	}
-	if err = binary.Read(r, binary.BigEndian, &t); err != nil {
-		return nil, err
-	}
-	params.k = int(t)
-	if err = binary.Read(r, binary.BigEndian, &t); err != nil {
-		return nil, err
-	}
-	params.n = int(t)
 	return params, nil
 }
 
-func serializeResponse(Y *big.Int, x int, B *big.Int, salt []byte, k int) ([]byte, error) {
+func serializeResponse(Y *big.Int, x int, B *big.Int, salt []byte, aux []byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := writeBigInt(buf, Y); err != nil {
 		return nil, err
@@ -412,13 +401,13 @@ func serializeResponse(Y *big.Int, x int, B *big.Int, salt []byte, k int) ([]byt
 	if err := packet.WriteChunk(buf, salt); err != nil {
 		return nil, err
 	}
-	if err := binary.Write(buf, binary.BigEndian, int32(k)); err != nil {
+	if err := packet.WriteChunk(buf, aux); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func parseResponse(res []byte) (Y *big.Int, x int, B *big.Int, salt []byte, k int, err error) {
+func parseResponse(res []byte) (Y *big.Int, x int, B *big.Int, salt []byte, aux []byte, err error) {
 	r := bytes.NewReader(res)
 	var t int32
 	if Y, err = readBigInt(r); err != nil {
@@ -434,9 +423,8 @@ func parseResponse(res []byte) (Y *big.Int, x int, B *big.Int, salt []byte, k in
 	if salt, err = packet.ReadChunk(r); err != nil {
 		return
 	}
-	if err = binary.Read(r, binary.BigEndian, &t); err != nil {
+	if aux, err = packet.ReadChunk(r); err != nil {
 		return
 	}
-	k = int(t)
 	return
 }

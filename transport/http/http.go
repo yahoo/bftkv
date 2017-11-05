@@ -10,9 +10,9 @@ import (
 	"time"
 	"context"
 	"strings"
-	"errors"
 	"log"
 
+	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/transport"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/crypto"
@@ -61,7 +61,7 @@ func (h *TrHTTP) Post(addr string, msg io.Reader) (io.ReadCloser, error) {
 		if res.StatusCode == http.StatusInternalServerError {
 			errs := res.Header.Get("X-error")
 			if errs != "" {
-				err = errors.New(errs)
+				err = bftkv.ErrorFromString(errs)
 			}
 		}
 		return nil, err
@@ -118,6 +118,12 @@ func (h *TrHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		cmd = transport.Write
 	case "sign":
 		cmd = transport.Sign
+	case "auth":
+		cmd = transport.Auth
+	case "setauth":
+		cmd = transport.SetAuth
+	case "register":
+		cmd = transport.Register
 	case "revoke":
 		cmd = transport.Revoke
 	case "notify":

@@ -5,10 +5,12 @@ package graph
 
 import (
 	"testing"
+	"strings"
 	"sort"
 	"io/ioutil"
 	"os"
 	"log"
+	"fmt"
 
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/crypto/pgp"
@@ -59,6 +61,9 @@ func constructGraph() (*Graph, error) {
 		return nil, err
 	}
 	for _, f := range files {
+		if strings.HasPrefix(f.Name(), ".") {
+			continue
+		}
 		path := keyPath + "/" + f.Name()
 		readCerts(g, crypt, path + "/pubring.gpg", false)
 		readCerts(g, crypt, path + "/secring.gpg", true)
@@ -187,18 +192,18 @@ func TestClieque(t *testing.T) {
 			for _, clique := range cliques {
 				// vvv print the resut vvv
 				var ids []string
-				for _, nn := range clique {
+				for _, nn := range clique.Nodes {
 					ids = append(ids, nn.Name())
 				}
 				t.Log(ids)
 				// ^^^
-				if !checkClique(g, clique) {
+				if !checkClique(g, clique.Nodes) {
 					t.Errorf("not a clique: %s", v.Instance.Name())
 				}
-				if !checkMaximal(g, clique) {
+				if !checkMaximal(g, clique.Nodes) {
 					t.Errorf("not maximal: %s", v.Instance.Name())
 				}
-				checkUniqueness(t, clique)
+				checkUniqueness(t, clique.Nodes)
 			}
 		}
 	}
@@ -222,4 +227,26 @@ func readCerts(g *Graph, crypt *crypto.Crypto, path string, sec bool) {
 	}
 	crypt.Keyring.Register(certs, sec, true)
 	f.Close()
+}
+
+func dump(g *Graph, prompt string) {
+	fmt.Printf(">>> %s <<<\n", prompt)
+	for _, v := range g.Vertices {
+		n := v.Instance
+		if n == nil {
+			continue
+		}
+		instance := ""
+		if n.Instance() == nil {
+			instance = "nil"
+		}
+		fmt.Printf("  %s [%x] %s\n", n.Name(), n.Id(), instance)
+		for _, e := range v.Edges {
+			if e.Instance != nil {
+				fmt.Printf("    %s\n", e.Instance.Name())
+			} else {
+				fmt.Printf("    ---\n")
+			}
+		}
+	}
 }

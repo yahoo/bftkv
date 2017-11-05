@@ -20,6 +20,7 @@ type Quorum interface {
 	IsThreshold(nodes []node.Node) bool
 	IsSufficient(nodes []node.Node) bool
 	Reject(nodes []node.Node) bool
+	GetThreshold() int
 }
 
 type QuorumSystem interface {

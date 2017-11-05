@@ -62,7 +62,7 @@ func (s *MalServer) signResult(req []byte, peer node.Node) ([]byte, error) {
 }
 
 func (s *MalServer) malSign(req []byte, peer node.Node) ([]byte, error) {
-	_, _, _, _, _, err := packet.Parse(req)
+	_, _, _, _, _, _, err := packet.Parse(req)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (s *MalServer) writeResult(req []byte, peer node.Node) ([]byte, error) {
 }
 
 func (s *MalServer) malWrite(req []byte, peer node.Node) ([]byte, error) {
-	variable, _, _, t, _, err := packet.Parse(req)
+	variable, _, t, _, _, _, err := packet.Parse(req)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (s *MalServer) malRead(req []byte, peer node.Node) ([]byte, error) {
 	}
 
 	if tvs != nil {
-		_, _, _, _, ss, err := packet.Parse(tvs)
+		_, _, _, _, ss, _, err := packet.Parse(tvs)
 		if err != nil {
 			return nil, err
 		}

@@ -54,8 +54,8 @@ func (g *Graph) AddNodes(nodes []node.Node) []node.Node {
 		if !ok {
 			self = NewVertex(n)
 			g.Vertices[skid] = self
-		} else if self.Instance == nil {
-			self.Instance = n
+		} else {
+			self.Instance = n	// replace the instance with the newly added one
 		}
 		// add the signers unless they have been revoked
 		for _, signer := range n.Signers() {
@@ -96,6 +96,12 @@ func (g *Graph) RemoveNodes(nodes []node.Node) {
 			delete(v.Edges, id)
 		}
 		delete(g.Vertices, id)
+		for i, self := range g.Self {
+			if self.Instance.Id() == id {
+				g.Self = append(g.Self[:i], g.Self[i+1:]...)
+				break
+			}
+		}
 	}
 	g.mutex.Unlock()
 }
@@ -155,9 +161,31 @@ func (g *Graph) SerializeSelf() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (g *Graph) isSelf(v *Vertex) bool {
+	for _, s := range g.Self {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 func (g *Graph) SerializeNodes(w io.Writer) error {
-	for _, v := range g.Vertices {
+	// serialize the self node first
+	for _, v := range g.Self {
 		if v.Instance == nil {
+			continue
+		}
+		pkt, err := v.Instance.Serialize()
+		if err != nil {
+			return err
+		}
+		if _, err := w.Write(pkt); err != nil {
+			return err
+		}
+	}
+	for _, v := range g.Vertices {
+		if v.Instance == nil || g.isSelf(v) {
 			continue
 		}
 		pkt, err := v.Instance.Serialize()

@@ -45,3 +45,6 @@ trust.sh -t signee b07 u11
 trust.sh -t signee b08 u11
 trust.sh -t signee b09 u11
 trust.sh -t signee b10 u11
+
+# for registration test
+gen.sh -uid "test1@example.com" test1

@@ -5,23 +5,25 @@ package crypto
 
 import (
 	"io"
-	"errors"
 
+	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/quorum"
 	"github.com/yahoo/bftkv/packet"
 )
 
 var (
-	ErrCertificateNotFound = errors.New("crypto: certifiate not found")
-	ErrKeyNotFound = errors.New("crypto: key not found")
-	ErrInvalidTransportSecurityData = errors.New("crypto: invalid transport security data")
-	ErrInsufficientNumberOfSignatures = errors.New("crypto: insufficient number of signatures")
-	ErrInvalidSignature = errors.New("crypto: invalid signature")
-	ErrSigniningFailed = errors.New("crypto: failed to sign")
-	ErrEncryptionFailed = errors.New("crypto: failed to encrypt")
-	ErrDecryptionFailed = errors.New("crypto: failed to decrypt")
-	ErrInsufficientNumberOfSecrets = errors.New("crypto: insufficient number of secrets")
+	ErrCertificateNotFound = bftkv.NewError("crypto: certifiate not found")
+	ErrKeyNotFound = bftkv.NewError("crypto: key not found")
+	ErrInvalidTransportSecurityData = bftkv.NewError("crypto: invalid transport security data")
+	ErrInsufficientNumberOfSignatures = bftkv.NewError("crypto: insufficient number of signatures")
+	ErrInvalidSignature = bftkv.NewError("crypto: invalid signature")
+	ErrSigningFailed = bftkv.NewError("crypto: failed to sign")
+	ErrEncryptionFailed = bftkv.NewError("crypto: failed to encrypt")
+	ErrDecryptionFailed = bftkv.NewError("crypto: failed to decrypt")
+	ErrInsufficientNumberOfSecrets = bftkv.NewError("crypto: insufficient number of secrets")
+	ErrInvalidInput = bftkv.NewError("crypto: invalid input")
+	ErrNoAuthenticationData = bftkv.NewError("crypto: no authentication data")
 )
 
 type Keyring interface {
@@ -35,6 +37,8 @@ type Certificate interface {
 	Parse(pkt []byte) ([]node.Node, error)
 	ParseStream(r io.Reader) ([]node.Node, error)
 	Signers(signee node.Node) []node.Node
+	Sign(signee node.Node) error
+	Merge(cert node.Node, sub node.Node) error
 }
 
 type Signature interface {
@@ -63,14 +67,14 @@ type CollectiveSignature interface {
 type AuthenticationClient interface {
 	GenerateAuthenticationData() ([]byte, error)
 	ProcessAuthResponse(res []byte, id uint64) (bool, error)
-	Decrypt(id uint64, cipher []byte) ([]byte, error)
-	GetCipherKey() []byte
+	GetAuxData(id uint64) ([]byte, error)
+	GetCipherKey() ([]byte, error)
 }
 
 type Authentication interface {
-	GeneratePartialAuthenticationData(cred []byte, n, k int) ([][]byte, error)
-	MakeResponse(ss []byte, challenge []byte, plain []byte) (res []byte, cipher []byte, err error)
-	NewClient(cred []byte) AuthenticationClient
+	GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error)
+	MakeResponse(ss []byte, challenge []byte, plain []byte) (res []byte, err error)
+	NewClient(cred []byte, n, k int) AuthenticationClient
 }
 
 type DataEncryption interface {

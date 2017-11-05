@@ -124,19 +124,30 @@ func NewKeyring() crypto.Keyring {
 	return &PGPKeyring{}
 }
 
-func (k *PGPKeyring) Register(nodes []node.Node, priv bool, self bool) error {
-	if !priv {
-		k.Remove(nodes)	// replace only pub keys
-	}
+func replace(ring openpgp.EntityList, nodes []node.Node) openpgp.EntityList {
+	targets := make(map[uint64]*openpgp.Entity)
 	for _, n := range nodes {
-		c := n.Instance().(*openpgp.Entity)
-		if priv {
-			k.secring = append(k.secring, c)
-		} else {
-			k.keyring = append(k.keyring, c)
-			if self {
-				k.self = append(k.self, c)
-			}
+		targets[n.Id()] = n.Instance().(*openpgp.Entity)
+	}
+	for i, e := range ring {
+		if n, exist := targets[e.PrimaryKey.KeyId]; exist {
+			ring[i] = n
+			delete(targets, e.PrimaryKey.KeyId)
+		}
+	}
+	for _, e := range targets {
+		ring = append(ring, e)
+	}
+	return ring
+}
+
+func (k *PGPKeyring) Register(nodes []node.Node, priv bool, self bool) error {
+	if priv {
+		k.secring = replace(k.secring, nodes)
+	} else {
+		k.keyring = replace(k.keyring, nodes)
+		if self {
+			k.self = replace(k.self, nodes[0:1])	// @@ the first one must be self
 		}
 	}
 	return nil
@@ -154,6 +165,14 @@ func (k *PGPKeyring) Remove(nodes []node.Node) {
 		}
 	}
 	k.keyring = newKeyring
+	// remove from the self certs as well
+	newKeyring = nil
+	for _, e := range k.self {
+		if _, ok := targets[e.PrimaryKey.KeyId]; !ok {
+			newKeyring = append(newKeyring, e)
+		}
+	}
+	k.self = newKeyring
 }
 
 func (k *PGPKeyring) GetCertById(id uint64) node.Node {
@@ -252,16 +271,34 @@ func (c *PGPCertificate) Signers(signee node.Node) []node.Node {
 }
 
 func (c *PGPCertificate) Sign(signee node.Node) error {
-	signer := c.keyring.GetPrivateKey()
+	signer := c.keyring.getPrivateKey()
 	if signer == nil {
 		return crypto.ErrKeyNotFound
 	}
 	e := signee.(*PGPCertificateInstance).entity
-	if len(e.Identities) < 1 {
+	id := ""
+	for i, _ := range e.Identities {
+		id = i
+		break	// use the first one
+	}
+	if id == "" {
 		return crypto.ErrCertificateNotFound
 	}
-	if e.SignIdentity(e.Identities[0], signer, nil) != nil {
-		return crypto.ErrSigniningFailed
+	if e.SignIdentity(id, signer, nil) != nil {
+		return crypto.ErrSigningFailed
+	}
+	return nil
+}
+
+func (c *PGPCertificate) Merge(target node.Node, sub node.Node) error {
+	et := target.(*PGPCertificateInstance).entity
+	es := sub.(*PGPCertificateInstance).entity
+	for i, tid := range et.Identities {
+		sid, ok := es.Identities[i]
+		if !ok {
+			continue
+		}
+		tid.Signatures = append(tid.Signatures, sid.Signatures...)
 	}
 	return nil
 }
@@ -406,11 +443,11 @@ func (msg *PGPMessage) EncryptStream(w io.Writer, peerId uint64, nonce []byte) (
 		return nil, crypto.ErrCertificateNotFound
 	}
 	to := []*openpgp.Entity{e}
-	w, err := openpgp.Encrypt(w, to, priv, &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
+	plainWriter, err = openpgp.Encrypt(w, to, priv, &openpgp.FileHints{true, base64.StdEncoding.EncodeToString(nonce), time.Unix(0, 0)}, nil)
 	if err != nil {
 		return nil, crypto.ErrEncryptionFailed
 	}
-	return w, nil
+	return plainWriter, nil
 }
 
 func (msg *PGPMessage) Decrypt(body io.Reader) (plain []byte, nonce []byte, peer node.Node, err error) {
@@ -468,6 +505,11 @@ func (cs *PGPCollectiveSignature) Sign(tbs []byte) (partialSignature *packet.Sig
 }
 
 func (cs *PGPCollectiveSignature) Combine(ss *packet.SignaturePacket, s *packet.SignaturePacket, q quorum.Quorum) bool {
+	if ss.Type == packet.SignatureTypeNil {
+		ss.Type = s.Type
+	} else if ss.Type != s.Type {
+		return false
+	}
 	ss.Data = append(ss.Data, s.Data...)
 	signers := cs.signature.Signers(ss)
 	return q.IsSufficient(signers)
@@ -484,7 +526,7 @@ func (cs *PGPCollectiveSignature) Signers(ss *packet.SignaturePacket) []node.Nod
 type DataEncryption struct {
 }
 
-func NewDataEncryption() crypt.DataEncryption {
+func NewDataEncryption() crypto.DataEncryption {
 	return &DataEncryption{}
 }
 
@@ -502,10 +544,10 @@ func (e *DataEncryption) Encrypt(key []byte, plain []byte) ([]byte, error) {
 }
 
 func (e *DataEncryption) Decrypt(key []byte, cipher []byte) ([]byte, error) {
-	m, err := openpgp.ReadMessage(bytes.NewReader(cipher), nil, func(keys []key, Symmetric bool) ([]byte, error) {
+	m, err := openpgp.ReadMessage(bytes.NewReader(cipher), nil, func(keys []openpgp.Key, Symmetric bool) ([]byte, error) {
 		return key, nil
 	}, nil)
-	plain, err = ioutil.ReadAll(m.UnverifiedBody)
+	plain, err := ioutil.ReadAll(m.UnverifiedBody)
 	if err != nil {
 		return nil, err
 	}

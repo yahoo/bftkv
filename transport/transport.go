@@ -6,8 +6,8 @@ package transport
 import (
 	"io"
 	"bytes"
-	"errors"
 
+	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/node"
 )
 
@@ -18,6 +18,9 @@ const (
 	Read
 	Write
 	Sign
+	Auth
+	SetAuth
+	Register
 	Revoke
 	Notify
 )
@@ -30,10 +33,10 @@ const (
 const Prefix = "/bftkv/v1/"
 
 var (
-	ErrTransportSecurity = errors.New("transport: transport security error")
-	ErrTransportNonceMismatch = errors.New("transport: nonce mismatch")
-	ErrServerError = errors.New("transport: server error")
-	ErrNoAddress = errors.New("transport: no address")
+	ErrTransportSecurity = bftkv.NewError("transport: transport security error")
+	ErrTransportNonceMismatch = bftkv.NewError("transport: nonce mismatch")
+	ErrServerError = bftkv.NewError("transport: server error")
+	ErrNoAddress = bftkv.NewError("transport: no address")
 )
 
 type MulticastResponse struct {
@@ -73,6 +76,12 @@ func Multicast(tr Transport, path int, peers []node.Node, data []byte, cb func(r
 		cmd = "write"
 	case Sign:
 		cmd = "sign"
+	case Auth:
+		cmd = "auth"
+	case SetAuth:
+		cmd = "setauth"
+	case Register:
+		cmd = "register"
 	case Revoke:
 		cmd = "revoke"
 	case Notify:

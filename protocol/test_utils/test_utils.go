@@ -1,7 +1,7 @@
 // Copyright 2017, Yahoo Holdings Inc.
 // Licensed under the terms of the Apache license. See LICENSE file in project root for terms.
 
-package protocol
+package test_utils
 
 import (
         "os"
@@ -9,8 +9,8 @@ import (
         "strings"
 	"testing"
 	"io/ioutil"
-	"bytes"
 
+	"github.com/yahoo/bftkv/protocol"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/pgp"
@@ -23,40 +23,15 @@ import (
 
 const (
 	scriptPath = "../scripts"	// any way to specify the absolute path?
-	keyPath = scriptPath + "/run/keys"	
+	KeyPath = scriptPath + "/run/keys"	
 	serverKeyPrefix = "a"
-	clientKey = "u01"
+	ClientKey = "u01"
 	dbPrefix = scriptPath + "/run/db."
 	testKey = "test"
 	testValue = "test"
 )
 
-func TestServer(t *testing.T) {
-	servers := runServers(t, "a", "rw")
-
-	defer func(servers []*Server) {
-		stopServers(servers)
-	}(servers)
-
-	// create a client
-	c := newClient(keyPath + "/" + clientKey)
-	c.Joining()
-
-	key := []byte(testKey)
-	value := []byte(testValue)
-	if err := c.Write(key, value, nil); err != nil {
-		t.Fatal(err)
-	}
-	res, err := c.Read(key, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(res, value) {
-		t.Errorf("Got %v\n", res)
-	}
-}
-
-func newServer(path string, dbPath string) *Server {
+func NewServer(path string, dbPath string) *protocol.Server {
 	crypt := pgp.New()
 	g := graph.New()
 	readCerts(g, crypt, path + "/pubring.gpg", false)
@@ -65,10 +40,10 @@ func newServer(path string, dbPath string) *Server {
 	var tr transport.Transport
 	tr = transport_http.New(crypt)
 	storage := storage_plain.New(dbPath)
-	return NewServer(node.SelfNode(g), qs, tr, crypt, storage)
+	return protocol.NewServer(node.SelfNode(g), qs, tr, crypt, storage)
 }
 
-func newClient(path string) *Client {
+func NewClient(path string) *protocol.Client {
 	crypt := pgp.New()
 	g := graph.New()
 	readCerts(g, crypt, path + "/pubring.gpg", false)
@@ -76,19 +51,19 @@ func newClient(path string) *Client {
 	qs := wotqs.New(g)
 	var tr transport.Transport
 	tr = transport_http.New(crypt)
-	return NewClient(node.SelfNode(g), qs, tr, crypt)
+	return protocol.NewClient(node.SelfNode(g), qs, tr, crypt)
 }
 
-func runServers(t *testing.T, prefixes ...string) []*Server {
-	files, err := ioutil.ReadDir(keyPath)
+func RunServers(t *testing.T, prefixes ...string) []*protocol.Server {
+	files, err := ioutil.ReadDir(KeyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var servers []*Server
+	var servers []*protocol.Server
 	for _, f := range files {
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(f.Name(), prefix) {
-				s := newServer(keyPath+"/"+f.Name(), dbPrefix+f.Name())
+				s := NewServer(KeyPath+"/"+f.Name(), dbPrefix+f.Name())
 				if err := s.Start(); err != nil {
 					t.Fatal(err)
 				}
@@ -100,7 +75,7 @@ func runServers(t *testing.T, prefixes ...string) []*Server {
 	return servers
 }
 
-func stopServers(servers []*Server) {
+func StopServers(servers []*protocol.Server) {
 	for _, s := range servers {
 		s.Stop()
 	}

@@ -34,7 +34,7 @@ func TestConflict(t *testing.T) {
 	var expecting string
 	for _, client := range clients {
 		go func(client *Client) {
-			err := client.Write([]byte(k), []byte(client.self.Name()))
+			err := client.Write([]byte(k), []byte(client.self.Name()), nil)
 			if err != nil {
 				t.Log(err)
 			} else {
@@ -51,7 +51,7 @@ func TestConflict(t *testing.T) {
 	c4 := newClient(keyPath + "/u04")
 	c4.Joining()
 	defer c4.Leaving()
-	res, err := c4.Read([]byte(k))
+	res, err := c4.Read([]byte(k), nil)
 	if err != nil {
 		t.Log(err)
 	}
@@ -72,7 +72,7 @@ func TestManyWrites(t *testing.T) {
 	defer c.Leaving()
 	start := time.Now()
 	for n := 0; n < rounds; n++ {
-		err := c.Write([]byte("abc"), []byte("def"))
+		err := c.Write([]byte("abc"), []byte("def"), nil)
 		if err != nil {
 			t.Log(err)
 		}
@@ -89,13 +89,13 @@ func TestManyReads(t *testing.T) {
 	c := newClient(keyPath + "/u01")
 	c.Joining()
 	defer c.Leaving()
-	err := c.Write([]byte("ghi"), []byte("jkl"))
+	err := c.Write([]byte("ghi"), []byte("jkl"), nil)
 	if err != nil {
 		t.Log(err)
 	}
 	start := time.Now()
 	for n := 0; n < rounds; n++ {
-		_, err := c.Read([]byte("ghi"))
+		_, err := c.Read([]byte("ghi"), nil)
 		if err != nil {
 			t.Log(err)
 		}
@@ -112,7 +112,7 @@ func TestManyClientsConcurrentReads(t *testing.T) {
 	c1 := newClient(keyPath + "/u01")
 	c1.Joining()
 	defer c1.Leaving()
-	err := c1.Write([]byte("mno"), []byte("pqr"))
+	err := c1.Write([]byte("mno"), []byte("pqr"), nil)
 	if err != nil {
 		t.Log(err)
 	}
@@ -122,7 +122,7 @@ func TestManyClientsConcurrentReads(t *testing.T) {
 	ch := make(chan int, num_clients)
 	for _, client := range clients {
 		go func(c *Client) {
-			_, err := c.Read([]byte("mno"))
+			_, err := c.Read([]byte("mno"), nil)
 			if err != nil {
 				t.Log(err)
 			}
@@ -157,7 +157,7 @@ func TestManyClientsConcurrentWrites(t *testing.T) {
 	for uid, c := range clients {
 		go func(c *Client, uid int) {
 			// byte array uid will always be unique
-			err := c.Write([]byte{byte(uid)}, []byte("dummyval"))
+			err := c.Write([]byte{byte(uid)}, []byte("dummyval"), nil)
 			if err != nil {
 				t.Log(err)
 			}

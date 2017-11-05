@@ -4,8 +4,6 @@
 package protocol
 
 import (
-	"bytes"
-
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/quorum"
@@ -21,12 +19,10 @@ type Protocol struct {
 
 func (p *Protocol) Joining() error {
 	m := make(map[uint64]bool)
-	var buf bytes.Buffer
-	err := p.self.SerializeNodes(&buf)
+	pkt, err := p.self.SerializeSelf()
 	if err != nil {
 		return err
 	}
-	pkt := buf.Bytes()
 	for {
 		peers := make([]node.Node, 0)
 		for _, n := range p.self.GetPeers() {

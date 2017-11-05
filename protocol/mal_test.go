@@ -60,7 +60,7 @@ func TestMaliciousCollusion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := c.Read(key)
+	res, err := c.Read(key, nil)
 	time.Sleep(time.Second * 3) // sleep to leave time for revoke check
 	if err != nil {
 		t.Fatal(err)
@@ -106,35 +106,8 @@ func TestTOFU(t *testing.T) {
 	c3.Leaving()
 }
 
-func runServers(t *testing.T, prefixes ...string) []*Server {
-	files, err := ioutil.ReadDir(keyPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var servers []*Server
-	for _, f := range files {
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(f.Name(), prefix) {
-				s := newServer(keyPath+"/"+f.Name(), dbPrefix+f.Name())
-				if err := s.Start(); err != nil {
-					t.Fatal(err)
-				}
-				servers = append(servers, s)
-			}
-		}
-	}
-
-	return servers
-}
-
-func stopServers(servers []*Server) {
-	for _, s := range servers {
-		s.Stop()
-	}
-}
-
 func (c *Client) checkTofu(key string, t *testing.T, exp string) {
-	if err := c.Write([]byte(key), []byte(testValue)); err != nil {
+	if err := c.Write([]byte(key), []byte(testValue), nil); err != nil {
 		t.Log(err)
 	} else {
 		t.Log(exp)

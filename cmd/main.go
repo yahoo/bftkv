@@ -223,7 +223,7 @@ func (s *apiService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "read":
 		err = s.bftClient.Joining()
 		if err == nil {
-			res, err = s.bftClient.Read([]byte(a[2]))
+			res, err = s.bftClient.Read([]byte(a[2]), nil)
 			s.bftClient.Leaving()
 		}
 	case "write":
@@ -238,9 +238,9 @@ func (s *apiService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = s.bftClient.Joining()
 		if err == nil {
 			if a[1] == "writeonce" {
-				err = s.bftClient.WriteOnce([]byte(a[2]), body)
+				err = s.bftClient.WriteOnce([]byte(a[2]), body, nil)
 			} else {
-				err = s.bftClient.Write([]byte(a[2]), body)
+				err = s.bftClient.Write([]byte(a[2]), body, nil)
 			}
 			s.bftClient.Leaving()
 		}

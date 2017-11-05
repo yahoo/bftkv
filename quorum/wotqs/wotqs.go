@@ -9,10 +9,6 @@ import (
 	"github.com/yahoo/bftkv/node/graph"
 )
 
-const (
-	maxCliqueDistance = 2
-)
-
 type wot struct {
 	g *graph.Graph
 }
@@ -108,12 +104,17 @@ func (qs *wot) getQuorumFrom(rw int, s uint64, distance int) *wotq {
 }
 
 func (qs *wot) ChooseQuorum(rw int) quorum.Quorum {
-	distance := maxCliqueDistance
+	var distance int
 	if (rw & quorum.CERT) != 0 {
 		distance = 0
+	} else if (rw & quorum.AUTH) != 0 {
+		distance = 1
+	} else {
+		distance = 2
 	}
 	return qs.getQuorumFrom(rw, qs.g.GetSelfId(), distance)
 }
+
 
 //
 // quorum
@@ -171,6 +172,14 @@ func (q *wotq) Reject(nodes []node.Node) bool {
 		}
 	}
 	return true
+}
+
+func (q *wotq) GetThreshold() int {
+	th := 0
+	for _, qc := range q.qcs {
+		th += qc.threshold
+	}
+	return th
 }
 
 func intersection(s1, s2 []node.Node) []node.Node {

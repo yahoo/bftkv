@@ -135,8 +135,8 @@ func (c *Client) signAndWrite(s_group []node.Node, rw_group []node.Node, value [
 
 	fmt.Println("Client: WriteMal - writing: ", string(value))
 
-	// self-sign over <x, v>
-	tbs, err := packet.Serialize(variable, value)
+	// self-sign over <x, v, t>
+	tbs, err := packet.Serialize(variable, value, maxt)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (c *Client) signAndWrite(s_group []node.Node, rw_group []node.Node, value [
 	if err != nil {
 		return err
 	}
-	tbss, err := packet.Serialize(variable, value, sig, maxt)
+	tbss, err := packet.Serialize(variable, value, maxt, sig)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (c *Client) signAndWrite(s_group []node.Node, rw_group []node.Node, value [
 	if err != nil {
 		return err
 	}
-	pkt, err := packet.Serialize(variable, value, sig, maxt, ss)
+	pkt, err := packet.Serialize(variable, value, maxt, sig, ss)
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func (c *Client) signAndWrite(s_group []node.Node, rw_group []node.Node, value [
 		return majorityError(errs, err)
 	}
 
-	pkt, err = packet.Serialize(variable, value, sig, maxt, ss)
+	pkt, err = packet.Serialize(variable, value, maxt, sig, ss)
 	if err != nil {
 		return err
 	}

@@ -4,11 +4,11 @@
 package storage
 
 import (
-	"errors"
+	"github.com/yahoo/bftkv"
 )
 
 var (
-	ErrNotFound = errors.New("storage: not found")
+	ErrNotFound = bftkv.NewError("storage: not found")
 )
 
 type Storage interface {
