@@ -6,88 +6,78 @@ package main
 import (
 	"flag"
 	"os"
-	"log"
+        "strings"
 	"fmt"
+	"io/ioutil"
 
-	"runtime/pprof"
-
-	"github.com/yahoo/bftkv/protocol"
-	"github.com/yahoo/bftkv/node/graph"
-	"github.com/yahoo/bftkv/crypto"
-	"github.com/yahoo/bftkv/crypto/pgp"
-	"github.com/yahoo/bftkv/quorum/wotqs"
-	transport_http "github.com/yahoo/bftkv/transport/http"
+	"github.com/yahoo/bftkv/api"
 )
 
-func main() {
-	defaultPath := os.Getenv("HOME") + "/.gnupg/"
-	pathp := flag.String("home", defaultPath, "path to home")
-	interp := flag.Int("n", 1, "iter")
-	prof := flag.String("p", "", "profile")
-	flag.Parse()
-	path := *pathp
-	iter := *interp
+var prefixes = []string{"a", "rw"}
 
-	if *prof != "" {
-		f, err := os.Create(*prof)
-		if err != nil {
-			log.Fatal("could not create CPU profile: ", err)
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal("could not start CPU profile: ", err)
-		}
-		defer pprof.StopCPUProfile()
+func main() {
+	keyp := flag.String("key", "key", "path to the key directory")
+	passp := flag.String("password", "", "password")
+	pathp := flag.String("path", "../scripts/run/keys", "path to the key directory")
+	flag.Parse()
+	key := *keyp
+	pass := *passp
+	path := *pathp
+
+	client, err := api.OpenClient(key)
+	if err != nil {
+		fmt.Errorf("%s: %s\n", path, err)
+		return
 	}
-	
-	crypt := pgp.New()
-	g := graph.New()
-	readCerts(g, crypt, path + "/pubring.gpg", false)
-	readCerts(g, crypt, path + "/secring.gpg", true)
-	client := protocol.NewClient(g, wotqs.New(g), transport_http.New(crypt), crypt)
-	client.Joining()
+	defer client.CloseClient()
 
 	av := flag.Args()
-	if len(av) == 0 {
+	ac := len(av)
+	if ac == 0 {
+		fmt.Errorf("Usage: %s [-path path] [-password password ] {register|read|write|} ...\n", os.Args[0])
 		return
 	}
-	if len(av) > 1 {
-		for ; iter > 0; iter-- {
-			err := client.Write([]byte(av[0]), []byte(av[1]))
-			if err != nil {
-				fmt.Printf("%s: %s\n", av[0], err)
-				return
+	switch (av[0]) {
+	case "register":
+		err := register(client, path, pass)
+		if err != nil {
+			fmt.Errorf("%s\n", err)
+		}
+	case "read":
+		for i := 1; i < ac; i++ {
+			val, err := client.Read([]byte(av[i]), pass)
+			if err == nil {
+				fmt.Printf("%s\n", string(val))
+			} else {
+				fmt.Errorf("%s\n", err)
 			}
 		}
-		iter = 1
-	}
-	var res []byte
-	for ; iter > 0; iter-- {
-		r, err := client.Read([]byte(av[0]))
-		if err != nil {
-			fmt.Printf("%s: %s\n", av[0], err)
-			return
+	case "write":
+		for i := 1; i + 1 < ac; i += 2 {
+			err := client.Write([]byte(av[i]), []byte(av[i + 1]), pass)
+			if err != nil {
+				fmt.Errorf("%s\n", err)
+			}
 		}
-		res = r
 	}
-	fmt.Printf("%s\n", string(res))
 }
 
-func readCerts(g *graph.Graph, crypt *crypto.Crypto, path string, sec bool) {
-	f, err := os.Open(path)
+func register(client *api.API, path string, pass string) error {
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
-	certs, err := crypt.Certificate.ParseStream(f)
-	if err != nil {
-		f.Close()
-		log.Fatal(err)
+	var certs []string
+	for _, f := range files {
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(f.Name(), prefix) {
+				certs = append(certs, path + "/" + f.Name())
+			}
+		}
 	}
-	if sec {
-		g.SetSelfNodes(certs)
-	} else {
-		g.AddNodes(certs)
+	fmt.Printf("registering with %v\n", certs)
+	if err := client.Register(certs, pass); err != nil {
+		return err
 	}
-	crypt.Keyring.Register(certs, sec, true)
-	f.Close()
+	return client.UpdateCert()
 }
