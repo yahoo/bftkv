@@ -14,6 +14,7 @@ import (
 
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/crypto"
+	"github.com/yahoo/bftkv/crypto/threshold"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/quorum"
 	"github.com/yahoo/bftkv/transport"
@@ -37,6 +38,8 @@ const (
 	AUTH_RETRY_LIMIT = 10
 	authHistoryPostfix = "......stayaway"
 )
+
+var hiddenPrefix = []byte("!!!secret!!!")
 	
 func NewServer(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Transport, crypt *crypto.Crypto, st storage.Storage) *Server {
 	return &Server{
@@ -128,6 +131,9 @@ func (s *Server) leave(req []byte, peer node.Node) ([]byte, error) {
 func (s *Server) time(req []byte, peer node.Node) ([]byte, error) {
 	variable := req
 	t := uint64(0)
+	if bytes.HasPrefix(variable, hiddenPrefix) {
+		return nil, bftkv.ErrPermissionDenied
+	}
 	tvs, err := s.st.Read(variable, 0)
 	if err != nil {
 		if err != storage.ErrNotFound {
@@ -149,6 +155,9 @@ func (s *Server) read(req []byte, peer node.Node) ([]byte, error) {
 	variable, _, _, _, proof, _, err := packet.Parse(req)
 	if err != nil {
 		return nil, err
+	}
+	if bytes.HasPrefix(variable, hiddenPrefix) {
+		return nil, bftkv.ErrPermissionDenied
 	}
 	tvs, err := s.st.Read(variable, 0)	// get the latest one
 	if err != nil && err != storage.ErrNotFound {
@@ -521,6 +530,33 @@ func (s *Server) register(req []byte, peer node.Node) ([]byte, error) {
 	return ret, err
 }
 
+func (s *Server) distribute(req []byte, peer node.Node) ([]byte, error) {
+	variable, val, _, _, _, _, err := packet.Parse(req)
+	if err != nil {
+		return nil, err
+	}
+	
+	if err := s.st.Write(append(hiddenPrefix, variable...), 0, val); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (s *Server) distSign(req []byte, peer node.Node) ([]byte, error) {
+	variable, val, _, _, _, _, err := packet.Parse(req)
+	if err != nil {
+		return nil, err
+	}
+	params, err := s.st.Read(append(hiddenPrefix, variable...), 0)
+	if err != nil {
+		return nil, err
+	}
+	if params == nil {
+		return nil, storage.ErrNotFound
+	}
+	return threshold.Sign(params, val)
+}
+
 func (s *Server) revoke(req []byte, peer node.Node) ([]byte, error) {
 	nodes, err := s.crypt.Certificate.Parse(req)
 	if err != nil {
@@ -601,6 +637,10 @@ func (s *Server) Handler(cmd int, r io.Reader, w io.Writer) error {
 		res, err = s.auth(req, peer)
 	case transport.SetAuth:
 		res, err = s.setAuth(req, peer)
+	case transport.Distribute:
+		res, err = s.distribute(req, peer)
+	case transport.DistSign:
+		res, err = s.distSign(req, peer)
 	case transport.Register:
 		res, err = s.register(req, peer)
 	case transport.Revoke:

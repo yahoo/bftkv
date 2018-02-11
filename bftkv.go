@@ -25,6 +25,7 @@ var (
 	ErrAuthenticationFailure = NewError("authentication failure")
 	ErrExist = NewError("already exist")
 	ErrInvalidUserID = NewError("invalid user ID")
+	ErrInvalidResponse = NewError("invalid response")
 )
 
 var errMap = make(map[string]error)

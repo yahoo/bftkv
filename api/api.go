@@ -5,11 +5,13 @@ package api
 
 import (
 	"os"
+	gocrypto "crypto"
 
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/protocol"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/pgp"
+	"github.com/yahoo/bftkv/crypto/threshold"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/node/graph"
 	"github.com/yahoo/bftkv/quorum"
@@ -76,7 +78,7 @@ func (api *API) Register(certs []string, password string) error {
 		return err
 	}
 	// read them into the graph
-	if err := api.client.Joining(); err != nil {	// re-joining so the client can constract the full graph
+	if err := api.client.Joining(); err != nil {	// re-joining so the client can construct the full graph
 		return err
 	}
 	// need to re-sign as Joining has overwritten some nodes
@@ -222,4 +224,12 @@ func (api *API) readCerts(path string, sec bool, self bool) ([]node.Node, error)
 		}
 	}
 	return certs, nil
+}
+
+func (api *API) Distribute(caname string, algo threshold.Algo, key interface{}) error {
+	return api.client.Distribute(caname, algo, key)
+}
+
+func (api *API) Sign(caname string, tbs []byte, algo threshold.Algo, dgst gocrypto.Hash) (sig []byte, err error) {
+	return api.client.DistSign(caname, tbs, algo, dgst)
 }

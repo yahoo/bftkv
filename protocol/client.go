@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"math"
 	"bytes"
+	gocrypto "crypto"
 	"errors"
 	"log"
 
@@ -16,6 +17,10 @@ import (
 	"github.com/yahoo/bftkv/quorum"
 	"github.com/yahoo/bftkv/transport"
 	"github.com/yahoo/bftkv/packet"
+	"github.com/yahoo/bftkv/crypto/threshold"
+	"github.com/yahoo/bftkv/crypto/threshold/rsa"
+	"github.com/yahoo/bftkv/crypto/threshold/dsa"
+	"github.com/yahoo/bftkv/crypto/threshold/ecdsa"
 )
 
 type Client struct {
@@ -453,4 +458,95 @@ func (c *Client) setupAuthenticationParameters(variable []byte, cred []byte, q q
 		return bftkv.ErrInsufficientNumberOfValidResponses
 	}
 	return nil
+}
+
+
+//
+// distributed crypto
+//
+
+func (c *Client) Distribute(caname string, algo threshold.Algo, key interface{}) error {
+	q := c.qs.ChooseQuorum(quorum.AUTH)
+	n := len(q.Nodes())
+	k := q.GetThreshold()
+	var secrets [][]byte
+	var err error
+	switch algo {
+	case threshold.RSA:
+		secrets, err = rsa.Distribute(key, n, k)
+	case threshold.DSA:
+		secrets, err = dsa.Distribute(key, n, k)
+	case threshold.ECDSA:
+		secrets, err = ecdsa.Distribute(key, n, k)
+	default:
+		return crypto.ErrUnsupported
+	}
+	if err != nil {
+		return err
+	}
+	succ := 0
+	for i, peer := range q.Nodes() {
+		val := threshold.SerializeParams(algo, secrets[i])
+		pkt, err := packet.Serialize([]byte(caname), val)		// do we need to sign?
+		if err != nil {
+			return err
+		}
+		c.tr.Multicast(transport.Distribute, []node.Node{peer}, pkt, func(res *transport.MulticastResponse) bool {
+			if res.Err == nil {
+				succ++
+			}
+			return false
+		})
+	}
+	if succ < k {
+		return bftkv.ErrInsufficientNumberOfResponses
+	}
+	return nil
+}
+
+func (c *Client) DistSign(caname string, tbs []byte, algo threshold.Algo, hash gocrypto.Hash) (sig []byte, err error) {
+	q := c.qs.ChooseQuorum(quorum.AUTH)
+	var proc crypto.ThresholdProcess
+	switch algo {
+	case threshold.RSA:
+		proc, err = rsa.NewProcess(q.Nodes(), q.GetThreshold(), tbs, hash)
+	case threshold.DSA:
+		proc, err = dsa.NewProcess(q.Nodes(), q.GetThreshold(), tbs, hash)
+	case threshold.ECDSA:
+		proc, err = ecdsa.NewProcess(q.Nodes(), q.GetThreshold(), tbs, hash)
+	default:
+		return nil, crypto.ErrUnsupported
+	}
+	if err != nil {
+		return nil, err
+	}
+	for {
+		nodes, req, err := proc.MakeRequest()
+		if err != nil {
+			return nil, err
+		}
+		if nodes == nil || len(nodes) == 0 {
+			return nil, bftkv.ErrInsufficientNumberOfResponses
+		}
+		pkt, err := packet.Serialize([]byte(caname), req)
+		if err != nil {
+			return nil, err
+		}
+		var sig []byte
+		succ := 0
+		c.tr.Multicast(transport.DistSign, nodes, pkt, func (res *transport.MulticastResponse) bool {
+			if res.Err == nil && res.Data != nil {
+				succ++
+				sig, err = proc.ProcessResponse(res.Data, res.Peer.Id())
+				return sig != nil || err != nil
+			}
+			return false
+		})
+		if sig != nil || err != nil {
+			return sig, err
+		}
+		if succ == 0 {	// no more new responses
+			return nil, bftkv.ErrInsufficientNumberOfResponses
+		}
+	}
 }

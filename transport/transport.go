@@ -20,6 +20,8 @@ const (
 	Sign
 	Auth
 	SetAuth
+	Distribute
+	DistSign
 	Register
 	Revoke
 	Notify
@@ -80,6 +82,10 @@ func Multicast(tr Transport, path int, peers []node.Node, data []byte, cb func(r
 		cmd = "auth"
 	case SetAuth:
 		cmd = "setauth"
+	case Distribute:
+		cmd = "distribute"
+	case DistSign:
+		cmd = "distsign"
 	case Register:
 		cmd = "register"
 	case Revoke:

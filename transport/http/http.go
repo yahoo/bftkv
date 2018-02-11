@@ -122,6 +122,10 @@ func (h *TrHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		cmd = transport.Auth
 	case "setauth":
 		cmd = transport.SetAuth
+	case "distribute":
+		cmd = transport.Distribute
+	case "distsign":
+		cmd = transport.DistSign
 	case "register":
 		cmd = transport.Register
 	case "revoke":

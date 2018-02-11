@@ -24,6 +24,8 @@ var (
 	ErrInsufficientNumberOfSecrets = bftkv.NewError("crypto: insufficient number of secrets")
 	ErrInvalidInput = bftkv.NewError("crypto: invalid input")
 	ErrNoAuthenticationData = bftkv.NewError("crypto: no authentication data")
+	ErrUnsupported = bftkv.NewError("crypto: unsupported algorithm")
+	ErrInsufficientNumberOfThresholdSignatures = bftkv.NewError("crypto: insufficient number of threshold signatures")
 )
 
 type Keyring interface {
@@ -85,6 +87,11 @@ type DataEncryption interface {
 type RNG interface {
 	Initialize(seed []byte)
 	Generate(n int) []byte
+}
+
+type ThresholdProcess interface {
+	MakeRequest() ([]node.Node, []byte, error)
+	ProcessResponse(res []byte, id uint64) ([]byte, error)
 }
 
 type Crypto struct {
