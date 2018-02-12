@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"encoding/pem"
 	"encoding/asn1"
+	"encoding/hex"
 	"crypto"
 	"crypto/x509"
 	"crypto/rsa"
@@ -27,6 +28,7 @@ func main() {
 	keyp := flag.String("key", "key", "path to the self key directory")
 	passp := flag.String("password", "", "password")
 	pathp := flag.String("path", "../scripts/run/keys", "path to the peer keys directory")
+	hexp := flag.Bool("hex", false, "key in hex")
 	flag.Parse()
 	key := *keyp
 	pass := *passp
@@ -53,7 +55,12 @@ func main() {
 		}
 	case "read":
 		for i := 1; i < ac; i++ {
-			val, err := client.Read([]byte(av[i]), pass)
+			key, err := toKey(av[i], *hexp)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				break
+			}
+			val, err := client.Read(key, pass)
 			if err == nil {
 				fmt.Printf("%s\n", string(val))
 			} else {
@@ -62,7 +69,12 @@ func main() {
 		}
 	case "write":
 		for i := 1; i + 1 < ac; i += 2 {
-			err := client.Write([]byte(av[i]), []byte(av[i + 1]), pass)
+			key, err := toKey(av[i], *hexp)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				break
+			}
+			err = client.Write(key, []byte(av[i + 1]), pass)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 			}
@@ -227,9 +239,22 @@ func sign(client *api.API, caname string, path string) error {
 	if err != nil {
 		return err
 	}
+
+	// register the new cert to SKI
+	if err := client.Write(crt.SubjectKeyId, der, ""); err != nil {
+		return err
+	}
 	return pem.Encode(os.Stdout, &pem.Block{
 		Type: "CERTIFICATE",
 		Headers: nil,
 		Bytes: der,
 	})
+}
+
+func toKey(s string, hexp bool) ([]byte, error) {
+	if hexp {
+		return hex.DecodeString(s)
+	} else {
+		return []byte(s), nil
+	}
 }
