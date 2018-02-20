@@ -3,7 +3,7 @@
 # Copyright 2017, Yahoo Holdings Inc.
 # Licensed under the terms of the Apache license. See LICENSE file in project root for terms.
 
-CWD=`pwd`
+export CWD=`pwd`/
 export PATH=$CWD:$PATH
 
 HOST=localhost

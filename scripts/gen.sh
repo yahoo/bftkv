@@ -3,6 +3,8 @@
 # Copyright 2017, Yahoo Holdings Inc.
 # Licensed under the terms of the Apache license. See LICENSE file in project root for terms.
 
+. ${CWD}check_gpg.sh
+
 url=""
 addr=""
 port=0
@@ -21,7 +23,7 @@ for i in "$@"; do
     chmod 700 $i .$i
     url=""
     if [ "$addr" != "" ]; then url=" ($addr:$port)"; port=`expr $port + 1`; fi
-    gpg2 --homedir .$i --batch --passphrase "" --quick-gen-key "$i$url$uid" default default never
-    gpg2 --homedir .$i --export-secret-key > $i/secring.gpg
-    gpg2 --homedir .$i --export > $i/pubring.gpg
+    $GPG --homedir .$i --batch --passphrase "" --quick-gen-key "$i$url$uid" default default never
+    $GPG --homedir .$i --export-secret-key > $i/secring.gpg
+    $GPG --homedir .$i --export > $i/pubring.gpg
 done
