@@ -248,7 +248,7 @@ func doTest(t *testing.T, n, k int, key interface{}) {
 			t.Fatal(err)
 		}
 		if !bytes.Equal(sig, want) {
-			t.Fatal("sig mismatch: %d, %d", n, n - nfaults)
+			t.Fatalf("sig mismatch: %d, %d", n, n - nfaults)
 			fmt.Println("sig mismatch")
 		} else {
 			t.Logf("success: fixed faulty nodes (%d, %d)", n, n - nfaults)
@@ -284,7 +284,7 @@ func doTest(t *testing.T, n, k int, key interface{}) {
 		} else if err != nil {
 			t.Fatal(err)
 		} else if !bytes.Equal(sig, want) {
-			t.Fatal("sig mismatch: (%d, %d)", n, k)
+			t.Fatalf("sig mismatch: (%d, %d)", n, k)
 			fmt.Println("sig mismatch")
 		} else {
 			t.Logf("success: random faulty nodes with %d faulty nodes (%d, %d)", len(fmap), n, k)
