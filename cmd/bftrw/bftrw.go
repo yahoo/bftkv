@@ -34,7 +34,7 @@ var prefixes = []string{"a", "rw"}
 
 func main() {
 	keyp := flag.String("key", "key", "path to the self key directory")
-	passp := flag.String("password", "", "password")
+	passp := flag.String("pass", "", "password, passphrase, pin, recovery key, ...")
 	pathp := flag.String("path", "../../scripts/run/keys", "path to the peer keys directory")
 	hexp := flag.Bool("hex", false, "key in hex")
 	b64p := flag.Bool("base64", false, "output in base64")
@@ -43,7 +43,7 @@ func main() {
 	pass := *passp
 	path := *pathp
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: %s [flags] register|read|write|ca|sign|kms|getkey\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] register|read|write|ca|sign|kms|getkey [args...]\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 
