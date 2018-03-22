@@ -24,7 +24,7 @@ func TestAuth(t *testing.T) {
 	c.Joining()
 
 	q := c.qs.ChooseQuorum(quorum.AUTH)
-	auth := c.crypt.Authentication.NewClient(cred, len(q.Nodes()), q.GetThreshold())
+	auth := c.auth.NewClient(cred, len(q.Nodes()), q.GetThreshold())
 	_, err := c.doAuthentication(auth, variable, q)
 	if err == crypto.ErrNoAuthenticationData {
 		t.Logf("setting up partial parameters\n")

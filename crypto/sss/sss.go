@@ -79,23 +79,27 @@ func (p *SSSProcess) ProcessResponse(coordinate *Coordinate) ([]byte, error) {
 }
 
 func (p *SSSProcess) calculateSecret() *big.Int {
+	var xs []int
+	for _, r := range p.res {
+		xs = append(xs, r.X)
+	}
 	S := big.NewInt(0)
 	for _, r := range p.res {
-		l := Lagrange(r.X, p.res, p.m)
+		l := Lagrange(r.X, xs, p.m)
 		S.Mod(S.Add(S, l.Mul(l, r.Y)), p.m)
 	}
 	return S
 }
 
-func Lagrange(x int, results []*Coordinate, m *big.Int) *big.Int {
+func Lagrange(x int, results []int, m *big.Int) *big.Int {
 	a := big.NewInt(1)
 	b := big.NewInt(1)
 	xj := big.NewInt(int64(x))
 	for _, res := range results {
-		if res.X == x {
+		if res == x {
 			continue
 		}
-		xm := big.NewInt(int64(res.X))
+		xm := big.NewInt(int64(res))
 		a.Mul(a, xm)
 		b.Mul(b, xm.Sub(xm, xj))
 	}

@@ -88,7 +88,7 @@ var (
 	nonce = []byte{0x94, 0x33, 0xa0, 0x1b, 0xcc, 0x09, 0x20, 0x6f}
 )
 
-func NewAuth() crypto.Authentication {
+func New() crypto.Authentication {
 	if p == nil {
 		// p = 2q + 1
 		p = new(big.Int).SetBytes(pb)
@@ -259,12 +259,12 @@ func (c *AuthClient) GetCipherKey() ([]byte, error) {
 func (c *AuthClient) calculateSharedSecret() *big.Int {
 	// g^s = (g^(y0))^l0 * (g^(y1))^l1 * ... 
 	gs := big.NewInt(1)
-	var coordinates []*sss.Coordinate
+	var xs []int
 	for _, r := range c.results {
-		coordinates = append(coordinates, &sss.Coordinate{r.X, r.Y})
+		xs = append(xs, r.X)
 	}
 	for _, res := range c.results {
-		l := sss.Lagrange(res.X, coordinates, q)
+		l := sss.Lagrange(res.X, xs, q)
 		t := new(big.Int).Exp(res.Y, l, p)
 		gs.Mod(gs.Mul(gs, t), p)
 	}

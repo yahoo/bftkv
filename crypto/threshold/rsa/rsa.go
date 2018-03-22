@@ -29,35 +29,49 @@ type partialParam struct {
 //
 // client API
 //
+type rsaContext struct {
+	crypt *crypto.Crypto
+	n, k int
+	nodes []node.Node
+}
+
 type paramTree struct {
 	idx uint32
 	di *big.Int
 	children map[uint32]*paramTree
 }
 
-func Distribute(key interface{}, n, k int) ([][]byte, error) {
-	priv := key.(*gorsa.PrivateKey)
-	kt, err := makeKeyTree(priv.D, 0, n, k)
-	if err != nil {
-		return nil, err
+func New(crypt *crypto.Crypto) crypto.Threshold {
+	return &rsaContext{
+		crypt: crypt,
 	}
-	var res [][]byte
-	for i := 0; i < n; i++ {
+}
+
+func (ctx *rsaContext) Distribute(key interface{}, nodes []node.Node, k int) (shares [][]byte, algo crypto.ThresholdAlgo, err error) {
+	ctx.nodes = nodes
+	ctx.n = len(ctx.nodes)
+	ctx.k = k
+	priv := key.(*gorsa.PrivateKey)
+	kt, err := makeKeyTree(priv.D, 0, ctx.n, ctx.k)
+	if err != nil {
+		return nil, algo, err
+	}
+	for i := 0; i < ctx.n; i++ {
 		keys := make(map[uint32]*big.Int)
 		collectKeys(kt, uint32(i), keys)
 		params := &partialParam{
 			keys: keys,
 			N: priv.N,
 			id: uint32(i),
-			n: n,
+			n: ctx.n,
 		}
 		secret, err := serializePartialParam(params)
 		if err != nil {
-			return nil, err
+			return nil, algo, err
 		}
-		res = append(res, secret)
+		shares = append(shares, secret)
 	}
-	return res, nil
+	return shares, crypto.TH_RSA, nil
 }
 
 func makeKeyTree(key *big.Int, idx uint32, n, k int) (*paramTree, error) {
@@ -125,7 +139,7 @@ func depth(idx uint32, n int) int {
 //
 // server API
 //
-func Sign(sec []byte, req []byte) ([]byte, error) {
+func (ctx *rsaContext) Sign(sec []byte, req []byte, peerId, selfId uint64) ([]byte, error) {
 	// parse the request
 	keys, hinfo, err := parseSignRequest(req)
 	if err != nil {
@@ -189,16 +203,16 @@ type hashInfo struct {
 	dgst []byte
 }
 
-func NewProcess(nodes []node.Node, k int, tbs []byte, hash gocrypto.Hash) (crypto.ThresholdProcess, error) {
+func (ctx *rsaContext) NewProcess(tbs []byte, algo crypto.ThresholdAlgo, hash gocrypto.Hash) (crypto.ThresholdProcess, error) {
 	// we do not know the original RSA parameters so we can't even encode TBS with PKCS1.5 at the client side
 	hinfo, err := serializeHashInfo(hash, tbs)
 	if err != nil {
 		return nil, err
 	}
 	return &rsaProc{
-		nodes: nodes,
-		n: len(nodes),
-		k: k,
+		nodes: ctx.nodes,
+		n: ctx.n,
+		k: ctx.k,
 		tree: &sigTree{0, nil, false, nil},
 		hinfo: hinfo,
 	}, nil
@@ -221,7 +235,7 @@ func (p *rsaProc) MakeRequest() ([]node.Node, []byte, error) {
 	return p.nodes, encoded, nil	// always try to broadcast to all nodes in case some inactive nodes might have been back online
 }
 
-func (p *rsaProc) ProcessResponse(data []byte, id uint64) ([]byte, error) {
+func (p *rsaProc) ProcessResponse(data []byte, peer node.Node) ([]byte, error) {
 	sigs, N, err := parsePartialSignature(data)
 	if err != nil {
 		return nil, err

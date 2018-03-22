@@ -14,6 +14,7 @@ import (
 
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/crypto"
+	"github.com/yahoo/bftkv/crypto/auth"
 	"github.com/yahoo/bftkv/crypto/threshold"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/quorum"
@@ -48,6 +49,8 @@ func NewServer(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Transpor
 			qs: qs,
 			tr: tr,
 			crypt: crypt,
+			auth: auth.New(),
+			threshold: threshold.New(crypt),
 		},
 		st: st,
 	}
@@ -415,7 +418,7 @@ func (s *Server) setAuth(req []byte, peer node.Node) ([]byte, error) {
 	return nil, nil
 }
 
-func (s *Server) auth(req []byte, peer node.Node) ([]byte, error) {
+func (s *Server) authenticate(req []byte, peer node.Node) ([]byte, error) {
 	variable, authdata, err := packet.ParseAuthenticationRequest(req)
 	if err != nil {
 		return nil, err
@@ -439,7 +442,7 @@ func (s *Server) auth(req []byte, peer node.Node) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.crypt.Authentication.MakeResponse(rauth, authdata, sig)
+	res, err := s.auth.MakeResponse(rauth, authdata, sig)
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +557,7 @@ func (s *Server) distSign(req []byte, peer node.Node) ([]byte, error) {
 	if params == nil {
 		return nil, storage.ErrNotFound
 	}
-	return threshold.Sign(params, val)
+	return s.threshold.Sign(params, val, peer.Id(), s.self.Id())
 }
 
 func (s *Server) revoke(req []byte, peer node.Node) ([]byte, error) {
@@ -634,7 +637,7 @@ func (s *Server) Handler(cmd int, r io.Reader, w io.Writer) error {
 	case transport.Sign:
 		res, err = s.sign(req, peer)
 	case transport.Auth:
-		res, err = s.auth(req, peer)
+		res, err = s.authenticate(req, peer)
 	case transport.SetAuth:
 		res, err = s.setAuth(req, peer)
 	case transport.Distribute:

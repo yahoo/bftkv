@@ -11,7 +11,6 @@ import (
 	"github.com/yahoo/bftkv/protocol"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/pgp"
-	"github.com/yahoo/bftkv/crypto/threshold"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/node/graph"
 	"github.com/yahoo/bftkv/quorum"
@@ -226,10 +225,10 @@ func (api *API) readCerts(path string, sec bool, self bool) ([]node.Node, error)
 	return certs, nil
 }
 
-func (api *API) Distribute(caname string, algo threshold.Algo, key interface{}) error {
-	return api.client.Distribute(caname, algo, key)
+func (api *API) Distribute(caname string, key interface{}) error {
+	return api.client.Distribute(caname, key)
 }
 
-func (api *API) Sign(caname string, tbs []byte, algo threshold.Algo, dgst gocrypto.Hash) (sig []byte, err error) {
+func (api *API) Sign(caname string, tbs []byte, algo crypto.ThresholdAlgo, dgst gocrypto.Hash) (sig []byte, err error) {
 	return api.client.DistSign(caname, tbs, algo, dgst)
 }

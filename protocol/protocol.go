@@ -15,6 +15,8 @@ type Protocol struct {
 	qs quorum.QuorumSystem
 	tr transport.Transport
 	crypt *crypto.Crypto
+	auth crypto.Authentication
+	threshold crypto.Threshold
 }
 
 func (p *Protocol) Joining() error {

@@ -5,6 +5,7 @@ package crypto
 
 import (
 	"io"
+	gocrypto "crypto"
 
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/node"
@@ -26,6 +27,8 @@ var (
 	ErrNoAuthenticationData = bftkv.NewError("crypto: no authentication data")
 	ErrUnsupported = bftkv.NewError("crypto: unsupported algorithm")
 	ErrInsufficientNumberOfThresholdSignatures = bftkv.NewError("crypto: insufficient number of threshold signatures")
+	ErrShareNotFound = bftkv.NewError("crypto: share not found")
+	ErrContinue = bftkv.NewError("crypto: continue")	// not an error but to tell the client the threshold process continues
 )
 
 type Keyring interface {
@@ -89,9 +92,23 @@ type RNG interface {
 	Generate(n int) []byte
 }
 
+type ThresholdAlgo byte
+const (
+	TH_UNKNOWN ThresholdAlgo = iota
+	TH_RSA
+	TH_DSA
+	TH_ECDSA
+)
+
+type Threshold interface {
+	Distribute(key interface{}, nodes []node.Node, k int) ([][]byte, ThresholdAlgo, error)
+	Sign(sec []byte, req []byte, peerId, selfId uint64) ([]byte, error)
+	NewProcess(tbs []byte, algo ThresholdAlgo, hash gocrypto.Hash) (ThresholdProcess, error)
+}
+
 type ThresholdProcess interface {
 	MakeRequest() ([]node.Node, []byte, error)
-	ProcessResponse(res []byte, id uint64) ([]byte, error)
+	ProcessResponse(res []byte, peer node.Node) ([]byte, error)
 }
 
 type Crypto struct {
@@ -102,5 +119,4 @@ type Crypto struct {
 	CollectiveSignature CollectiveSignature
 	DataEncryption DataEncryption
 	RNG RNG
-	Authentication Authentication
 }

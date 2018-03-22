@@ -73,7 +73,8 @@ func TestDistribution(t *testing.T) {
 //	}
 //	fmt.Printf("\n")
 
-	params, err := Distribute(key, n, k)
+	ctx := New(nil)	// the argument won't be used
+	params, _, err := ctx.Distribute(key, make([]node.Node, n), k)	// nodes won't be used
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +228,8 @@ func doTest(t *testing.T, n, k int, key interface{}) {
 		t.Fatal(err)
 	}
 
-	params, err := Distribute(key, n, k)
+	ctx := New(nil)
+	params, _, err := ctx.Distribute(key, make([]node.Node, n), k)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +238,7 @@ func doTest(t *testing.T, n, k int, key interface{}) {
 	for nfaults := 0; nfaults <= n - k; nfaults++ {
 		faults := rand.Perm(n)[0:nfaults]
 		fmt.Printf("testing fixed faulty nodes (%d, %d)\n", n, n - nfaults)
-		sig, err := doProcess(n, k, params, nfaults + 1, func(i, j int) bool {	// nfaults + 1 must be sufficient to retry
+		sig, err := doProcess(ctx, n, k, params, nfaults + 1, func(i, j int) bool {	// nfaults + 1 must be sufficient to retry
 			for _, f := range faults {
 				if f == i {
 					return true
@@ -261,7 +263,7 @@ func doTest(t *testing.T, n, k int, key interface{}) {
 		lastIterate := -1
 		var faults []int
 		fmap := make(map[int]bool)
-		sig, err := doProcess(n, k, params, 100, func(i, j int) bool {	// 100 should be more than enough..
+		sig, err := doProcess(ctx, n, k, params, 100, func(i, j int) bool {	// 100 should be more than enough..
 			if j > lastIterate {
 				nfaults := rand.Intn(n - k + 1)
 				faults = rand.Perm(n)[0:nfaults]
@@ -293,8 +295,8 @@ func doTest(t *testing.T, n, k int, key interface{}) {
 	}
 }
 
-func doProcess(n, k int, params [][]byte, retry int, isFault func(i, n int) bool) ([]byte, error) {
-	proc, err := NewProcess(make([]node.Node, n), k, []byte(testTBS), gocrypto.SHA256)
+func doProcess(ctx crypto.Threshold, n, k int, params [][]byte, retry int, isFault func(i, n int) bool) ([]byte, error) {
+	proc, err := ctx.NewProcess([]byte(testTBS), gocrypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +323,7 @@ func doProcess(n, k int, params [][]byte, retry int, isFault func(i, n int) bool
 			if isFault(j, i) {
 				continue
 			}
-			res, err := Sign(params[j], req)
+			res, err := ctx.Sign(params[j], req, 0, 0)
 			if err != nil {
 				return nil, err
 			}
@@ -337,7 +339,7 @@ func doProcess(n, k int, params [][]byte, retry int, isFault func(i, n int) bool
 				}
 				fmt.Printf("}\n")
 			}
-			sig, err := proc.ProcessResponse(res, uint64(0))
+			sig, err := proc.ProcessResponse(res, nodes[i])
 			if err != nil {
 				return nil, err
 			}

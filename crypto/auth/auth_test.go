@@ -14,7 +14,7 @@ import (
 func testAuth(t *testing.T, password []byte, plainData []byte) {
 	k := 4
 	n := 10
-	auth := NewAuth()
+	auth := New()
 
 	ss, err := auth.GeneratePartialAuthenticationParams(password, n, k)
 	if err != nil {

@@ -13,15 +13,13 @@ import (
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/base64"
-	"crypto"
+	gocrypto "crypto"
 	"crypto/x509"
-	"crypto/rsa"
-	"crypto/ecdsa"
 	"crypto/rand"
 	"errors"
 
 	"github.com/yahoo/bftkv/api"
-	"github.com/yahoo/bftkv/crypto/threshold"
+	"github.com/yahoo/bftkv/crypto"
 )
 
 const (
@@ -208,16 +206,7 @@ func ca(client *api.API, caname string, path string) error {
 	if err != nil {
 		return err
 	}
-	var algo threshold.Algo
-	switch key.(type) {
-	case *rsa.PrivateKey:
-		algo = threshold.RSA
-	case *ecdsa.PrivateKey:
-		algo = threshold.ECDSA
-	default:	// no DSA!?
-		return errors.New("unsupported algorithm")
-	}
-	return client.Distribute(caname, algo, key)
+	return client.Distribute(caname, key)
 }
 
 type certificate struct {
@@ -245,27 +234,27 @@ func sign(client *api.API, caname string, path string) error {
 	if err != nil {
 		return err
 	}
-	var alg threshold.Algo
-	var hash crypto.Hash
+	var alg crypto.ThresholdAlgo
+	var hash gocrypto.Hash
 	switch crt.SignatureAlgorithm {
 	case x509.SHA256WithRSA:
-		alg = threshold.RSA
-		hash = crypto.SHA256
+		alg = crypto.TH_RSA
+		hash = gocrypto.SHA256
 	case x509.SHA384WithRSA:
-		alg = threshold.RSA
-		hash = crypto.SHA384
+		alg = crypto.TH_RSA
+		hash = gocrypto.SHA384
 	case x509.SHA512WithRSA:
-		alg = threshold.RSA
-		hash = crypto.SHA512
+		alg = crypto.TH_RSA
+		hash = gocrypto.SHA512
 	case x509.ECDSAWithSHA256:
-		alg = threshold.ECDSA
-		hash = crypto.SHA256
+		alg = crypto.TH_ECDSA
+		hash = gocrypto.SHA256
 	case x509.ECDSAWithSHA384:
-		alg = threshold.ECDSA
-		hash = crypto.SHA384
+		alg = crypto.TH_ECDSA
+		hash = gocrypto.SHA384
 	case x509.ECDSAWithSHA512:
-		alg = threshold.ECDSA
-		hash = crypto.SHA512
+		alg = crypto.TH_ECDSA
+		hash = gocrypto.SHA512
 	default:
 		return errors.New("unsupported signature algorithm")
 	}

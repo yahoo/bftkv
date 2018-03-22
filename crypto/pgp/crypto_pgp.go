@@ -23,7 +23,6 @@ import (
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/packet"
 	"github.com/yahoo/bftkv/quorum"
-	"github.com/yahoo/bftkv/crypto/auth"
 )
 
 
@@ -590,6 +589,5 @@ func New() *crypto.Crypto {
 	instance.CollectiveSignature = NewCollectiveSignature(instance.Signature)
 	instance.DataEncryption = NewDataEncryption()
 	instance.RNG = NewRNG()
-	instance.Authentication = auth.NewAuth()
 	return instance
 }

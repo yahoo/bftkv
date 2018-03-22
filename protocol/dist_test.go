@@ -8,16 +8,21 @@ import (
 	"bytes"
 	"io/ioutil"
 	"encoding/pem"
-	"crypto"
+	gocrypto "crypto"
 	"crypto/rsa"
+	"crypto/dsa"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/x509"
+	"crypto/rand"
+	"math/big"
 
-	"github.com/yahoo/bftkv/crypto/threshold"
+	"github.com/yahoo/bftkv/crypto"
 )
 
 const (
-	caname = "testCA"
-	cakey = "../crypto/threshold/rsa/test.pkcs8"
+	rsakey = "../crypto/threshold/rsa/test.pkcs8"
+	dsakey = "../crypto/threshold/dsa/test.pkcs8"
 	testData = "TBS"
 )
 
@@ -28,57 +33,104 @@ func TestDist(t *testing.T) {
 	c := newClient(keyPath + "/u01")
 	c.Joining()
 
-	priv := readPKCS8(cakey)
-	if priv == nil {
-		t.Fatal("couldn't read the key")
+	doTest(t, c, "testRSA", crypto.TH_RSA)
+	doTest(t, c, "testDSA", crypto.TH_DSA)
+}
+
+func doTest(t *testing.T, c *Client, caname string, algo crypto.ThresholdAlgo) {
+	var key interface{}
+	var err error
+	var orderSize int
+	switch algo {
+	case crypto.TH_RSA:
+		key, err = rsa.GenerateKey(rand.Reader, 2048)
+	case crypto.TH_DSA:
+		var dsaPriv dsa.PrivateKey
+		if err = dsa.GenerateParameters(&dsaPriv.Parameters, rand.Reader, dsa.L1024N160); err == nil {
+			if err = dsa.GenerateKey(&dsaPriv, rand.Reader); err == nil {
+				key = &dsaPriv
+				orderSize = (dsaPriv.Q.BitLen() + 7) / 8
+			}
+		}
+	case crypto.TH_ECDSA:
+		key, err = ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
 	}
-	err := c.Distribute(caname, threshold.RSA, priv)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := c.Distribute(caname, key); err != nil {
+		t.Fatal(err)
+	}
 
-	sig, err := c.DistSign(caname, []byte(testData), threshold.RSA, crypto.SHA256)
+	sig, err := c.DistSign(caname, []byte(testData), algo, gocrypto.SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// calculate the standard sig
-	h := crypto.SHA256.New()
+	h := gocrypto.SHA256.New()
 	h.Write([]byte(testData))
 	hashed := h.Sum(nil)
-	want, err := rsa.SignPKCS1v15(nil, priv.(*rsa.PrivateKey), crypto.SHA256, hashed)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(sig, want) {
-		t.Fatal("sig mismatch")
+	switch algo {
+	case crypto.TH_RSA:
+		want, err := rsa.SignPKCS1v15(nil, key.(*rsa.PrivateKey), gocrypto.SHA256, hashed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(sig, want) {
+			t.Fatal("sig mismatch")
+		}
+	default:
+		// simply divide the sig into two
+		n := len(sig)
+		r := new(big.Int).SetBytes(sig[:n/2])
+		s := new(big.Int).SetBytes(sig[n/2:])
+		h := gocrypto.SHA256.New()
+		h.Write([]byte(testData))
+		dgst := h.Sum(nil)[:orderSize]
+		switch algo {
+		case crypto.TH_DSA:
+			priv := key.(*dsa.PrivateKey)
+			if !dsa.Verify(&priv.PublicKey, dgst, r, s) {
+				t.Fatal("dsa fail")
+			}
+		case crypto.TH_ECDSA:
+			priv := key.(*ecdsa.PrivateKey)
+			if !ecdsa.Verify(&priv.PublicKey, dgst, r, s) {
+				t.Fatal("ecdsa fail")
+			}
+		}
 	}
 }
 
-func readPKCS8(path string) interface{} {
+func readPKCS8(path string) (algo crypto.ThresholdAlgo, key interface{}, err error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil
+		return
 	}
 	block, _ := pem.Decode(data)
 	var der []byte
 	if block != nil {
 		if block.Type != "PRIVATE KEY" {
-			return nil
+			return
 		}
 		der = block.Bytes
 	} else {	// not PEM, assume the data is DER
 		der = data
 	}
-	priv, err := x509.ParsePKCS8PrivateKey(der)
+	key, err = x509.ParsePKCS8PrivateKey(der)
 	if err != nil {
-		return nil
+		return
 	}
-	switch key := priv.(type) {
+	switch key.(type) {
 	case *rsa.PrivateKey:
-		return key
+		algo = crypto.TH_RSA
+	case *dsa.PrivateKey:
+		algo = crypto.TH_DSA
+	case *ecdsa.PrivateKey:
+		algo = crypto.TH_ECDSA
 	default:
-		return nil
+		return
 	}
+	return
 }

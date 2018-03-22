@@ -13,14 +13,12 @@ import (
 
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/crypto"
+	"github.com/yahoo/bftkv/crypto/auth"
+	"github.com/yahoo/bftkv/crypto/threshold"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/quorum"
 	"github.com/yahoo/bftkv/transport"
 	"github.com/yahoo/bftkv/packet"
-	"github.com/yahoo/bftkv/crypto/threshold"
-	"github.com/yahoo/bftkv/crypto/threshold/rsa"
-	"github.com/yahoo/bftkv/crypto/threshold/dsa"
-	"github.com/yahoo/bftkv/crypto/threshold/ecdsa"
 )
 
 type Client struct {
@@ -57,6 +55,8 @@ func NewClient(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Transpor
 		qs: qs,
 		tr: tr,
 		crypt: crypt,
+		auth: auth.New(),
+		threshold: threshold.New(crypt),
 	}}
 }
 
@@ -360,7 +360,7 @@ func (c *Client) doRevoke(tbr node.Node, revoked []uint64, node_type string) []u
 
 func (c *Client) Authenticate(variable []byte, cred []byte) (proof *packet.SignaturePacket, key []byte, err error) {
 	q := c.qs.ChooseQuorum(quorum.AUTH)
-	auth := c.crypt.Authentication.NewClient(cred, len(q.Nodes()), q.GetThreshold())
+	auth := c.auth.NewClient(cred, len(q.Nodes()), q.GetThreshold())
 	proof, err = c.doAuthentication(auth, variable, q)
 	if err == crypto.ErrNoAuthenticationData {
 		// need to register first
@@ -437,7 +437,7 @@ func (c *Client) setupAuthenticationParameters(variable []byte, cred []byte, q q
 	}
 
 	// send out auth params to each member of the quorum
-	params, err := c.crypt.Authentication.GeneratePartialAuthenticationParams(cred, len(q.Nodes()), q.GetThreshold())
+	params, err := c.auth.GeneratePartialAuthenticationParams(cred, len(q.Nodes()), q.GetThreshold())
 	if err != nil {
 		return err
 	}
@@ -465,22 +465,10 @@ func (c *Client) setupAuthenticationParameters(variable []byte, cred []byte, q q
 // distributed crypto
 //
 
-func (c *Client) Distribute(caname string, algo threshold.Algo, key interface{}) error {
+func (c *Client) Distribute(caname string, key interface{}) error {
 	q := c.qs.ChooseQuorum(quorum.AUTH)
-	n := len(q.Nodes())
 	k := q.GetThreshold()
-	var secrets [][]byte
-	var err error
-	switch algo {
-	case threshold.RSA:
-		secrets, err = rsa.Distribute(key, n, k)
-	case threshold.DSA:
-		secrets, err = dsa.Distribute(key, n, k)
-	case threshold.ECDSA:
-		secrets, err = ecdsa.Distribute(key, n, k)
-	default:
-		return crypto.ErrUnsupported
-	}
+	secrets, algo, err := c.threshold.Distribute(key, q.Nodes(), k)
 	if err != nil {
 		return err
 	}
@@ -504,19 +492,8 @@ func (c *Client) Distribute(caname string, algo threshold.Algo, key interface{})
 	return nil
 }
 
-func (c *Client) DistSign(caname string, tbs []byte, algo threshold.Algo, hash gocrypto.Hash) (sig []byte, err error) {
-	q := c.qs.ChooseQuorum(quorum.AUTH)
-	var proc crypto.ThresholdProcess
-	switch algo {
-	case threshold.RSA:
-		proc, err = rsa.NewProcess(q.Nodes(), q.GetThreshold(), tbs, hash)
-	case threshold.DSA:
-		proc, err = dsa.NewProcess(q.Nodes(), q.GetThreshold(), tbs, hash)
-	case threshold.ECDSA:
-		proc, err = ecdsa.NewProcess(q.Nodes(), q.GetThreshold(), tbs, hash)
-	default:
-		return nil, crypto.ErrUnsupported
-	}
+func (c *Client) DistSign(caname string, tbs []byte, algo crypto.ThresholdAlgo, hash gocrypto.Hash) (sig []byte, err error) {
+	proc, err := c.threshold.NewProcess(tbs, algo, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -537,11 +514,14 @@ func (c *Client) DistSign(caname string, tbs []byte, algo threshold.Algo, hash g
 		c.tr.Multicast(transport.DistSign, nodes, pkt, func (res *transport.MulticastResponse) bool {
 			if res.Err == nil && res.Data != nil {
 				succ++
-				sig, err = proc.ProcessResponse(res.Data, res.Peer.Id())
+				sig, err = proc.ProcessResponse(res.Data, res.Peer)
 				return sig != nil || err != nil
 			}
 			return false
 		})
+		if err == crypto.ErrContinue {
+			continue
+		}
 		if sig != nil || err != nil {
 			return sig, err
 		}
