@@ -243,7 +243,7 @@ func TestDSA(t *testing.T) {
 	// phase 1
 	var js []*jointShareParams
 	kk := big.NewInt(0)
-	for i := 0; i < n; i++ {
+	for i := 0; i < 2*k; i++ {
 		k_share, a_share, b_share, c_share, ki, err := firstPhase()
 		if err != nil {
 			t.Fatal(err)
@@ -369,9 +369,7 @@ func secondPhase(i int, js []*jointShareParams) (x int, ri, vi, ki, ci *big.Int,
 	}
 	ri = new(big.Int).Exp(g, ai, p)
 	vi = new(big.Int).Mul(ki, ai)
-	vi.Mod(vi, q)
-	vi.Add(vi, bi)
-	vi.Mod(vi, q)
+	vi.Mod(vi.Add(vi.Mod(vi, q), bi), q)
 	return
 }
 
@@ -385,6 +383,12 @@ func thirdPhase(m, r *big.Int, xi *sss.Coordinate, ki, c *big.Int) (int, *big.In
 	return xi.X, si
 }
 
+type server struct {
+	self node.SelfNode
+	crypt *crypto.Crypto
+	th crypto.Threshold
+}
+
 func TestThreshold(t *testing.T) {
 	var priv godsa.PrivateKey
 	if err := godsa.GenerateParameters(&priv.Parameters, crand.Reader, godsa.L1024N160); err != nil {
@@ -395,17 +399,23 @@ func TestThreshold(t *testing.T) {
 	}
 	orderSize := (priv.Q.BitLen() + 7) / 8
 
-	crypt := pgp.New()
-	ctx := New(crypt)
-	peers, err := newServers(crypt, "a")
+	servers, err := newServers("a")
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	crypt := pgp.New()
+	client := New(nil)
 	self, err := newClient(crypt, clientKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	params, algo, err := ctx.Distribute(&priv, peers, k)
+
+	var peers []node.Node
+	for _, server := range servers {
+		peers = append(peers, server.self)
+	}
+	params, algo, err := client.Distribute(&priv, peers, k)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,7 +424,7 @@ func TestThreshold(t *testing.T) {
 		shares[peer.Id()] = params[i]
 	}
 
-	proc, err := ctx.NewProcess([]byte(testTBS), algo, gocrypto.SHA256)
+	proc, err := client.NewProcess([]byte(testTBS), algo, gocrypto.SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +437,8 @@ func TestThreshold(t *testing.T) {
 			t.Fatal(crypto.ErrInsufficientNumberOfThresholdSignatures)
 		}
 		for _, nd := range nodes {
-			psig, err := ctx.Sign(shares[nd.Id()], req, self.Id(), nd.Id())	// don't be confused with self/peer IDs: peer=client(self)
+			serverId := nd.Id()
+			psig, err := servers[serverId].th.Sign(shares[serverId], req, self.Id(), serverId)	// don't be confused with self/peer IDs: peer=client(self)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -457,26 +468,47 @@ func TestThreshold(t *testing.T) {
 	t.Fatal(crypto.ErrInsufficientNumberOfThresholdSignatures)
 }
 
-func newServers(crypt *crypto.Crypto, prefixes ...string) ([]node.Node, error) {
-	g := graph.New()
+func newServers(prefixes ...string) (map[uint64]*server, error) {
 	files, err := ioutil.ReadDir(keyPath)
 	if err != nil {
 		return nil, err
 	}
+	servers := make(map[uint64]*server)
 	for _, f := range files {
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(f.Name(), prefix) {
 				path := keyPath + "/" + f.Name()
-				if err := readCerts(g, crypt, path + "/pubring.gpg", false); err != nil {
+				g := graph.New()
+				crypt := pgp.New()
+				if err := readPeers(g, crypt, files, prefixes); err != nil {
 					return nil, err
 				}
 				if err := readCerts(g, crypt, path + "/secring.gpg", true); err != nil {
 					return nil, err
 				}
+				servers[g.Id()] = &server{
+					self: node.SelfNode(g),
+					crypt: crypt,
+					th: New(crypt),
+				}
 			}
 		}
 	}
-	return g.GetPeers(), nil
+	return servers, nil
+}
+
+func readPeers(g *graph.Graph, crypt *crypto.Crypto, files []os.FileInfo, prefixes []string) error {
+	for _, f := range files {
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(f.Name(), prefix) {
+				path := keyPath + "/" + f.Name()
+				if err := readCerts(g, crypt, path + "/pubring.gpg", false); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func newClient(crypt *crypto.Crypto, path string) (node.Node, error) {

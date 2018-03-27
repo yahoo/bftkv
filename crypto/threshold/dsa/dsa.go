@@ -109,8 +109,8 @@ func (ctx *dsaContext) Sign(sec []byte, req []byte, peerId, selfId uint64) ([]by
 			// ri = g^ai mod p
 			ri := new(big.Int).Exp(g, ai, p)
 			// vi = ki*ai + bi mod q
-			vi := new(big.Int).Add(new(big.Int).Mul(ki, ai), bi)
-			vi.Mod(vi, q)
+			vi := new(big.Int).Mul(ki, ai)
+			vi.Mod(vi.Add(vi.Mod(vi, q), bi), q)
 			psig, err = serializePartialSignature(x, ri, vi, p, q, g)
 			if err != nil {
 				return nil, err
@@ -177,23 +177,6 @@ func (ctx *dsaContext) encrypt(k, a, b, c []*sss.Coordinate, nodes []node.Node, 
 	return res, nil
 }
 
-func serializeShare(k, a, b, c *sss.Coordinate) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := serializeCoord(&buf, k); err != nil {
-		return nil, err
-	}
-	if err := serializeCoord(&buf, a); err != nil {
-		return nil, err
-	}
-	if err := serializeCoord(&buf, b); err != nil {
-		return nil, err
-	}
-	if err := serializeCoord(&buf, c); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
 func (ctx *dsaContext) decrypt(shares [][]byte, q *big.Int, selfId, peerId uint64) (x int, ki, ai, bi, ci *big.Int, err error) {
 	x = -1
 	ki = big.NewInt(0)
@@ -215,7 +198,7 @@ func (ctx *dsaContext) decrypt(shares [][]byte, q *big.Int, selfId, peerId uint6
 			err = nil	// clear the error -- to avoid to eliminate the self share
 		}
 		k, a, b, c, err1 := parseShare(plain)
-		if err != nil {
+		if err1 != nil {
 			err = err1
 			return
 		}
@@ -235,6 +218,20 @@ func (ctx *dsaContext) decrypt(shares [][]byte, q *big.Int, selfId, peerId uint6
 	return
 }
 
+func serializeShare(k, a, b, c *sss.Coordinate) (chunk []byte, err error) {
+	var buf bytes.Buffer
+	if err = serializeCoord(&buf, k); err == nil {
+		if err = serializeCoord(&buf, a); err == nil {
+			if err = serializeCoord(&buf, b); err == nil {
+				if err = serializeCoord(&buf, c); err == nil {
+					chunk = buf.Bytes()
+				}
+			}
+		}
+	}
+	return
+}
+
 func parseShare(data []byte) (k, a, b, c *sss.Coordinate, err error) {
 	r := bytes.NewReader(data)
 	if k, err = parseCoord(r); err == nil {
@@ -249,7 +246,7 @@ func parseShare(data []byte) (k, a, b, c *sss.Coordinate, err error) {
 
 type dsaProc struct {
 	nodes []node.Node
-	t int
+	t, n int
 	m *big.Int
 	r *big.Int
 	s *big.Int
@@ -268,6 +265,7 @@ func (ctx *dsaContext) NewProcess(tbs []byte, algo crypto.ThresholdAlgo, hash go
 	return &dsaProc{
 		nodes: ctx.nodes,
 		t: ctx.t,
+		n: len(ctx.nodes),
 		m: new(big.Int).SetBytes(dgst),
 		r: nil,
 		s: nil,
