@@ -45,7 +45,8 @@ func New(crypt *crypto.Crypto) crypto.Threshold {
 
 func (ctx *dsaContext) Distribute(key interface{}, nodes []node.Node, t int) (shares [][]byte, algo crypto.ThresholdAlgo, err error) {
 	if t*2 > len(nodes) {
-		return shares, algo, crypto.ErrInsufficientNumberOfThresholdSignatures
+		// return shares, algo, crypto.ErrInvalidInput
+		t = len(nodes) / 2	// @@ take the closest threshold for now
 	}
 	ctx.nodes = nodes
 	ctx.n = len(nodes)
