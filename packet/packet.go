@@ -6,6 +6,7 @@ package packet
 import (
 	"bytes"
 	"io"
+	"math/big"
 
 	"encoding/binary"
 )
@@ -267,4 +268,21 @@ func SerializeAuthenticationRequest(variable []byte, adata []byte) ([]byte, erro
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+
+func ReadBigInt(r *bytes.Reader) (*big.Int, error) {
+	c, err := ReadChunk(r)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(c), nil
+}
+
+func WriteBigInt(buf *bytes.Buffer, b *big.Int) error {
+	var c []byte
+	if b != nil {
+		c = b.Bytes()
+	}
+	return WriteChunk(buf, c)
 }

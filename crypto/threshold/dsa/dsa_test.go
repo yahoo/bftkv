@@ -11,15 +11,12 @@ import (
 	gocrypto "crypto"
 	godsa "crypto/dsa"
 	crand "crypto/rand"
-        "os"
-	"io/ioutil"
-        "strings"
 
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/sss"
 	"github.com/yahoo/bftkv/crypto/pgp"
+	"github.com/yahoo/bftkv/crypto/threshold/dsa/test_utils"
 	"github.com/yahoo/bftkv/node"
-	"github.com/yahoo/bftkv/node/graph"
 )
 
 const (
@@ -223,19 +220,26 @@ type jointShareParams struct {
 }
 
 func TestDSA(t *testing.T) {
-	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	// construct DSA parameters
+	var priv godsa.PrivateKey
+	if err := godsa.GenerateParameters(&priv.Parameters, crand.Reader, godsa.L1024N160); err != nil {
+		t.Fatal(err)
+	}
+	if err := godsa.GenerateKey(&priv, crand.Reader); err != nil {
+		t.Fatal(err)
+	}
+
+	group := dsaGroupOperations{&priv.Parameters}
+	q := group.SubGroupOrder()
 	orderSize := (q.BitLen() + 7) / 8
+
 	// generate a random message
 	msg := make([]byte, orderSize)
 	rand.Read(msg)
 	m := new(big.Int).SetBytes(msg)
 
-	// generate a random private key x and its share
-	x, err := crand.Int(crand.Reader, q)
-	if err != nil {
-		t.Fatal(err)
-	}
-	xs, err := sss.Distribute(x, n, k, q)
+	// get the shares
+	xs, err := sss.Distribute(priv.X, n, k, q)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +248,7 @@ func TestDSA(t *testing.T) {
 	var js []*jointShareParams
 	kk := big.NewInt(0)
 	for i := 0; i < 2*k; i++ {
-		k_share, a_share, b_share, c_share, ki, err := firstPhase()
+		k_share, a_share, b_share, c_share, ki, err := firstPhase(q)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -255,20 +259,23 @@ func TestDSA(t *testing.T) {
 	// phase 2
 	var nodes []int
 	var r *big.Int
-	var rs, vs []*sss.Coordinate
+	var rs []*PartialR
 	var ks, cs []*big.Int
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for _, i := range rnd.Perm(n) {
-		xi, ri, vi, ki, ci, err := secondPhase(i, js)
+		xi, ki, ai, bi, ci, err := secondPhase(i, js, q, priv.P)
 		if err != nil {
 			t.Fatal(err)
 		}
-		rs = append(rs, &sss.Coordinate{xi, ri})
-		vs = append(vs, &sss.Coordinate{xi, vi})
+		ri := group.CalculatePartialR(ai)
+		vi := new(big.Int).Mul(ki, ai)
+		vi.Mod(vi.Add(vi.Mod(vi, q), bi), q)
+		rs = append(rs, &PartialR{xi, ri, vi})
 		ks = append(ks, ki)
 		cs = append(cs, ci)
 		nodes = append(nodes, i)
 		if len(rs) >= 2*k {
-			r = calculateR(rs, vs, p, q)
+			r = group.CalculateR(rs)
 			break
 		}
 	}
@@ -277,7 +284,7 @@ func TestDSA(t *testing.T) {
 	}
 	// check if r ?= g^k^-1
 	kinv := new(big.Int).ModInverse(kk, q)
-	rr := new(big.Int).Exp(g, kinv, p)
+	rr := new(big.Int).Exp(priv.G, kinv, priv.P)
 	rr.Mod(rr, q)
 	if r.Cmp(rr) != 0 {
 		t.Fatal("r mismatch")
@@ -287,7 +294,7 @@ func TestDSA(t *testing.T) {
 	var s *big.Int
 	var ss []*sss.Coordinate
 	for i, j := range nodes {	// must be the same nodes in the second phase
-		x_, si := thirdPhase(m, r, xs[j], ks[i], cs[i])
+		x_, si := thirdPhase(m, r, xs[j], ks[i], cs[i], q)
 		ss = append(ss, &sss.Coordinate{x_, si})
 		if len(ss) >= 2*k {
 			s = calculateS(ss, q)
@@ -298,7 +305,7 @@ func TestDSA(t *testing.T) {
 		t.Fatal("s == nil!")
 	}
 	// check if s ?= k(m + xr)
-	sr := new(big.Int).Mul(x, r)
+	sr := new(big.Int).Mul(priv.X, r)
 	sr.Mod(sr, q)
 	sr.Mod(sr.Add(sr, m), q)
 	sr.Mod(sr.Mul(sr, kk), q)
@@ -307,18 +314,12 @@ func TestDSA(t *testing.T) {
 	}
 
 	// double-check (s, r) with Verify()
-	var pub godsa.PublicKey
-	pub.P = p
-	pub.Q = q
-	pub.G = g
-	pub.Y = new(big.Int)
-	pub.Y.Exp(g, x, p)
-	if !Verify(&pub, msg, r, s) {
+	if !godsa.Verify(&priv.PublicKey, msg, r, s) {
 		t.Fatal("verification failed")
 	}
 }
 
-func firstPhase() (k_share, a_share, b_share, c_share []*sss.Coordinate, ki *big.Int, err error) {
+func firstPhase(q *big.Int) (k_share, a_share, b_share, c_share []*sss.Coordinate, ki *big.Int, err error) {
 	ki, err = crand.Int(crand.Reader, q)
 	if err != nil {
 		return
@@ -344,11 +345,11 @@ func firstPhase() (k_share, a_share, b_share, c_share []*sss.Coordinate, ki *big
 
 // ri = g^ai mod p
 // vi = ai*ki + bi mod q
-func secondPhase(i int, js []*jointShareParams) (x int, ri, vi, ki, ci *big.Int, err error) {
+func secondPhase(i int, js []*jointShareParams, q, p *big.Int) (x int, ki, ai, bi, ci *big.Int, err error) {
 	x = -1
 	ki = big.NewInt(0)
-	ai := big.NewInt(0)
-	bi := big.NewInt(0)
+	ai = big.NewInt(0)
+	bi = big.NewInt(0)
 	ci = big.NewInt(0)
 	for _, share := range js {
 		kj := share.k_share[i]
@@ -367,13 +368,10 @@ func secondPhase(i int, js []*jointShareParams) (x int, ri, vi, ki, ci *big.Int,
 		bi.Mod(bi.Add(bi, bj.Y), q)
 		ci.Mod(ci.Add(ci, cj.Y), q)
 	}
-	ri = new(big.Int).Exp(g, ai, p)
-	vi = new(big.Int).Mul(ki, ai)
-	vi.Mod(vi.Add(vi.Mod(vi, q), bi), q)
 	return
 }
 
-func thirdPhase(m, r *big.Int, xi *sss.Coordinate, ki, c *big.Int) (int, *big.Int) {
+func thirdPhase(m, r *big.Int, xi *sss.Coordinate, ki, c *big.Int, q *big.Int) (int, *big.Int) {
 	// si = ki(m + xi*r) + c mod q
 	si := new(big.Int).Mul(xi.Y, r)
 	si.Mod(si, q)
@@ -383,13 +381,8 @@ func thirdPhase(m, r *big.Int, xi *sss.Coordinate, ki, c *big.Int) (int, *big.In
 	return xi.X, si
 }
 
-type server struct {
-	self node.SelfNode
-	crypt *crypto.Crypto
-	th crypto.Threshold
-}
-
 func TestThreshold(t *testing.T) {
+	// construct DSA parameters
 	var priv godsa.PrivateKey
 	if err := godsa.GenerateParameters(&priv.Parameters, crand.Reader, godsa.L1024N160); err != nil {
 		t.Fatal(err)
@@ -397,23 +390,24 @@ func TestThreshold(t *testing.T) {
 	if err := godsa.GenerateKey(&priv, crand.Reader); err != nil {
 		t.Fatal(err)
 	}
+
 	orderSize := (priv.Q.BitLen() + 7) / 8
 
-	servers, err := newServers("a")
+	servers, err := test_utils.NewServers(New, "a")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	crypt := pgp.New()
 	client := New(nil)
-	self, err := newClient(crypt, clientKey)
+	self, err := test_utils.NewClient(crypt, clientKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var peers []node.Node
 	for _, server := range servers {
-		peers = append(peers, server.self)
+		peers = append(peers, server.Self)
 	}
 	params, algo, err := client.Distribute(&priv, peers, k)
 	if err != nil {
@@ -438,7 +432,7 @@ func TestThreshold(t *testing.T) {
 		}
 		for _, nd := range nodes {
 			serverId := nd.Id()
-			psig, err := servers[serverId].th.Sign(shares[serverId], req, self.Id(), serverId)	// don't be confused with self/peer IDs: peer=client(self)
+			psig, err := servers[serverId].Th.Sign(shares[serverId], req, self.Id(), serverId)	// don't be confused with self/peer IDs: peer=client(self)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -458,7 +452,7 @@ func TestThreshold(t *testing.T) {
 				h := gocrypto.SHA256.New()
 				h.Write([]byte(testTBS))
 				dgst := h.Sum(nil)[:orderSize]
-				if !Verify(&priv.PublicKey, dgst, r, s) {
+				if !godsa.Verify(&priv.PublicKey, dgst, r, s) {
 					t.Fatal("verifiation failed")
 				}
 				return
@@ -466,113 +460,4 @@ func TestThreshold(t *testing.T) {
 		}
 	}
 	t.Fatal(crypto.ErrInsufficientNumberOfThresholdSignatures)
-}
-
-func newServers(prefixes ...string) (map[uint64]*server, error) {
-	files, err := ioutil.ReadDir(keyPath)
-	if err != nil {
-		return nil, err
-	}
-	servers := make(map[uint64]*server)
-	for _, f := range files {
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(f.Name(), prefix) {
-				path := keyPath + "/" + f.Name()
-				g := graph.New()
-				crypt := pgp.New()
-				if err := readPeers(g, crypt, files, prefixes); err != nil {
-					return nil, err
-				}
-				if err := readCerts(g, crypt, path + "/secring.gpg", true); err != nil {
-					return nil, err
-				}
-				servers[g.Id()] = &server{
-					self: node.SelfNode(g),
-					crypt: crypt,
-					th: New(crypt),
-				}
-			}
-		}
-	}
-	return servers, nil
-}
-
-func readPeers(g *graph.Graph, crypt *crypto.Crypto, files []os.FileInfo, prefixes []string) error {
-	for _, f := range files {
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(f.Name(), prefix) {
-				path := keyPath + "/" + f.Name()
-				if err := readCerts(g, crypt, path + "/pubring.gpg", false); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func newClient(crypt *crypto.Crypto, path string) (node.Node, error) {
-	g := graph.New()
-	if err := readCerts(g, crypt, path + "/pubring.gpg", false); err != nil {
-		return nil, err
-	}
-	if err := readCerts(g, crypt, path + "/secring.gpg", true); err != nil {
-		return nil, err
-	}
-	return node.Node(g), nil
-}
-
-func readCerts(g *graph.Graph, crypt *crypto.Crypto, path string, sec bool) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	certs, err := crypt.Certificate.ParseStream(f)
-	if err != nil {
-		return err
-	}
-	if sec {
-		g.SetSelfNodes(certs)
-	} else {
-		g.AddNodes(certs)
-	}
-	crypt.Keyring.Register(certs, sec, true)
-	return nil
-}
-
-// copied from https://golang.org/src/crypto/dsa/dsa.go
-func Verify(pub *godsa.PublicKey, hash []byte, r, s *big.Int) bool {
-  	// FIPS 186-3, section 4.7
-	
-  	if pub.P.Sign() == 0 {
-  		return false
-  	}
-	
-  	if r.Sign() < 1 || r.Cmp(pub.Q) >= 0 {
-  		return false
-  	}
-  	if s.Sign() < 1 || s.Cmp(pub.Q) >= 0 {
-  		return false
-  	}
-	
-  	w := new(big.Int).ModInverse(s, pub.Q)
-	
-  	n := pub.Q.BitLen()
-  	if n&7 != 0 {
-  		return false
-  	}
-  	z := new(big.Int).SetBytes(hash)
-	
-  	u1 := new(big.Int).Mul(z, w)
-  	u1.Mod(u1, pub.Q)
-  	u2 := w.Mul(r, w)
-  	u2.Mod(u2, pub.Q)
-  	v := u1.Exp(pub.G, u1, pub.P)
-  	u2.Exp(pub.Y, u2, pub.P)
-  	v.Mul(v, u2)
-  	v.Mod(v, pub.P)
-  	v.Mod(v, pub.Q)
-	
-  	return v.Cmp(r) == 0
 }

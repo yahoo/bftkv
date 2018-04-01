@@ -35,12 +35,12 @@ func TestDist(t *testing.T) {
 
 	doTest(t, c, "testRSA", crypto.TH_RSA)
 	doTest(t, c, "testDSA", crypto.TH_DSA)
+	doTest(t, c, "testECDSA", crypto.TH_ECDSA)
 }
 
 func doTest(t *testing.T, c *Client, caname string, algo crypto.ThresholdAlgo) {
 	var key interface{}
 	var err error
-	var orderSize int
 	switch algo {
 	case crypto.TH_RSA:
 		key, err = rsa.GenerateKey(rand.Reader, 2048)
@@ -49,11 +49,10 @@ func doTest(t *testing.T, c *Client, caname string, algo crypto.ThresholdAlgo) {
 		if err = dsa.GenerateParameters(&dsaPriv.Parameters, rand.Reader, dsa.L1024N160); err == nil {
 			if err = dsa.GenerateKey(&dsaPriv, rand.Reader); err == nil {
 				key = &dsaPriv
-				orderSize = (dsaPriv.Q.BitLen() + 7) / 8
 			}
 		}
 	case crypto.TH_ECDSA:
-		key, err = ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
+		key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -87,11 +86,12 @@ func doTest(t *testing.T, c *Client, caname string, algo crypto.ThresholdAlgo) {
 		s := new(big.Int).SetBytes(sig[n/2:])
 		h := gocrypto.SHA256.New()
 		h.Write([]byte(testData))
-		dgst := h.Sum(nil)[:orderSize]
+		dgst := h.Sum(nil)
 		switch algo {
 		case crypto.TH_DSA:
 			priv := key.(*dsa.PrivateKey)
-			if !dsa.Verify(&priv.PublicKey, dgst, r, s) {
+			orderSize := (priv.Q.BitLen() + 7) / 8
+			if !dsa.Verify(&priv.PublicKey, dgst[:orderSize], r, s) {
 				t.Fatal("dsa fail")
 			}
 		case crypto.TH_ECDSA:
