@@ -146,6 +146,9 @@ func (k *PGPKeyring) Register(nodes []node.Node, priv bool, self bool) error {
 	} else {
 		k.keyring = replace(k.keyring, nodes)
 		if self {
+			if len(nodes) == 0 {
+				return crypto.ErrCertificateNotFound
+			}
 			k.self = replace(k.self, nodes[0:1])	// @@ the first one must be self
 		}
 	}
