@@ -232,3 +232,8 @@ func (api *API) Distribute(caname string, key interface{}) error {
 func (api *API) Sign(caname string, tbs []byte, algo crypto.ThresholdAlgo, dgst gocrypto.Hash) (sig []byte, err error) {
 	return api.client.DistSign(caname, tbs, algo, dgst)
 }
+
+func (api *API) UId() string {
+	self := node.SelfNode(api.g)
+	return self.UId()
+}
