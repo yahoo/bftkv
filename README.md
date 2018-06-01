@@ -42,7 +42,7 @@ A list of parameters that can be supplied to bftkv is given below:
 ## Run Options
 1. Run a node `bftkv -home gnupg.key`
 
-2. Run a BFTKV cluster `cd scripts; run.sh`
+2. Run a BFTKV cluster `cd scripts/run; ../run.sh`
 
 3. Run a BFTKV cluster in Docker
 
