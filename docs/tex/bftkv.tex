@@ -48,7 +48,7 @@
 \section{Introduction}
 How to reach a consensus with Byzantine type failure is the main
 problem of blockchain technologies. Bitcoin blockchain uses PoW with
-incentives. Majority of public blockchain (or permission-less
+incentives \cite{bitcoin}. Majority of public blockchain (or permission-less
 blockchain) has the same type of consensus mechanism. Another type of
 consensus mechanism is to use BFT protocols, which is a major
 mechanism for local/enterprise blockchain (or permissioned
@@ -75,24 +75,27 @@ The proposed system uses a distributed key-value store with the TOFU
 others from mutating the value associated with the key. Only the
 user who has written the key-value first will posses the right to
 update the value. The system does not gurantee absolute
-consistency. Also the order of transaction for different keys does not
+consistency. Also the order of transactions for different keys does not
 matter. The system does not even provide eventual consistency among
 individual nodes. Instead, it has a property such as: $READ(Q_1, x) =
 READ(Q_2, x), \forall Q_1, Q_2 \in QS$, that is, the consistency is
 established collectively with quorum systems.
 
-Smart contract is out of scope. Also the system itself does not
-provide any incentive mechanism to discourage nodes to do malicious
-actions, or to encourage to participate the consensus process. The
-system has a robust revocation scheme but it does not answer for a
-question like why would one want to run a node? Although all
-transactions keep a proof of good or bad actions of nodes therefore it
-will be straightforward to map it to economic incenstives and
-penalties, we defer fintech discussions to an application layer.
+Smart contracts play an important role in some blockchain technologies
+such as Etherium and Fabric. As the proposed system is a simple
+key-value store, it does not provide a platform for smart contracts at
+the moment. Also, the system itself does not provide any incentive
+mechanism to discourage nodes to do malicious actions, or to encourage
+to participate the consensus process. The system has a robust
+revocation scheme but it does not answer for a question like why would
+one want to run a node? Although all transactions keep a proof of good
+or bad actions for each node therefore it will be straightforward to
+map it to economic incenstives and penalties, we defer fintech
+discussions to an application layer.
 
 \section{Background}
 
-We explain some technologies used in the system.
+This section describes some existing technologies used in the system.
 
 \subsection{Quorum Systems}
 A variety of quorum systems have been used to manage replicated data /
@@ -100,10 +103,10 @@ storage in distributed systems. We briefly describe the original
 quorum systems and its extension called Byzantine quorum
 systems. Later, we construct a byzantine quorum system based on Web of
 Trust.
-The system defines two operations, READ and WRITE, between a client
-and a set of servers called a quorum. A quorum system ($QS \subseteq
-2^U$) is a subset of the powerset of all servers ($U$), and it
-satisfies a property:
+The system defines two operations, {\em read} and {\em write}, between
+a client and a set of servers called a quorum. A quorum system ($QS
+\subseteq 2^U$) is a subset of the powerset of all servers ($U$), and
+it satisfies a property:
 \[
   \forall Q_1, Q_2 \in QS, Q_1 \cap Q_2 \neq \emptyset
 \]
@@ -112,7 +115,7 @@ satisfies a property:
 With this property, it is guaranteed that the client always retrieves
 the latest value from at least one server.
 
-Melhi and Reiter \cite{Delhi:1} extends the property to handle
+Melhi and Reiter \cite{Delhi:1} extend the property to handle
 Byzantine failure:
 \begin{align*}
   \forall Q_1, Q_2 \in QS, \forall B \in BF, Q_1 \cap Q_2 \nsubseteq B
@@ -127,12 +130,13 @@ equivocation (aka double spending in blockchain terms).
 \subsection{Web of Trust}
 A web of trust is a directed graph $G = (V, E)$, where $V$ is a set of
 nodes (each of which is a pair of unique ID and public key) and $E$ is a
-set of trust relationship: when $(v_1, v_2) \in E$, $v1$ trusts $v_2$,
+set of trust relationship: when $(v_1, v_2) \in E$, $v1$ \{em trusts|
+$v_2$,
 i.e., the certificate of $v2$ includes a signature over its public key
 with the private key of $v_1$. WoT was introduced by PGP to
 authenticate certificates of peers without relying on central
 authorities. We use the same mechanism to authenticate not only
-end-users' certificates but quorum members as well.
+end-users' certificates but quorum members' as well.
 
 \subsection{Threshold Cryptosystems}
 Threshold cryptosystems play important roles in this system. We use it
@@ -142,20 +146,21 @@ Shamir's Shared Secret (SSS) is a major tool to construct threshold
 cryptographic schemes. The system uses SSS for both password
 authentication and DSA / ECDSA signature schemes. Especially for the
 latter, the system uses the siganture scheme introduced by Gennaro et
-al.\ \cite[Gennaro]. The threshold password authentication the system
+al.\ \cite{Gennaro}. The threshold password authentication the system
 adopts uses SRP \cite{srp} with SSS. See ~\ref{threshold} for the
 details.
 SSS uses a $t-1$ degree random polynomial on $\mathbb{Z}_q$
 \[
   f(x) = \sum_{i=0}^{t-1}a_ix^i \bmod q
 \]
-Each ``share'' is $(i, f(i)), i = 1..n$. To reconstruct the shared secret $f(0)$,
-calculate lagrange interpolate from $t$ servers out of $n$
+Each {\em share} is $(i, f(i))_{i = 1..n}$. To reconstruct the shared
+secret $f(0)$, calculate lagrange interpolate from $t$ responses out
+of $n$
 \[
     \lambda_j = \prod_{l \in \mathcal{T} \setminus \{j\}}
     i_l / (i_l - i_j) \bmod q
 \]
-then
+then we get
 \[
   f(0) = \sum_{j \in \mathcal{T}} f(j)\lambda_j
 \]
@@ -163,27 +168,25 @@ where $\mathcal{T}$ is a subset of $\{1..n\}$ and $|\mathcal{T}| =
 t$.
 
 To construct a $(t, n)$ threshold scheme, we follow the quorum
-threshold, i.e., $n = |Q|, t = n-b$. But the method of \cite[Gennaro]
+threshold, i.e., $n = |Q|, t = n-b$. But the method of \cite{Gennaro}
 needs $n \geq 2t$ therefore the quorum threshold cannot apply for DSA
 / ECSA signatures. 
 For RSA signatures, it may seem straightforward to apply SSS to the
 RSA signing process such as:
-\[ S = M^{f(0)} \bmod N \]
-and combine partial signatures
-\[ \prod_{i \in \mathcal{K}} M^{f(i)\lambda_i} \]
+\[ S = M^{f(0)} = \prod_{i \in \mathcal{T}} M^{f(i)\lambda_i} \bmod N \]
 however, since to calculate $\lambda_i$ we need the multiplicative
 inverse on $\varphi(N)$ which must be kept as secret as the private
-key, we cannot simply appy SSS to RSA signatures. Shoup \cite[shoup]
+key, we cannot simply appy SSS to RSA signatures. Shoup \cite{shoup}
 solved this problem by getting rid of multiplicative inverse all
 together but it needs a special construction of the RSA parameters,
-that may make it difficult to apply existing keys to the
+which makes it difficult to apply existing keys to the
 method. Therefore we use a simple key hierachy to address this
-issue. See ~\ref{threshold} for the details.
+issue. See \ref{threshold} for the details.
 
 \section{Methodology}
 \subsection{Quorum Cliques}
 We follow the faulty clients (dishonest writers) scenario described in
-\cite[Delhi:1,Delhi:2], which uses signed messages and
+\cite{Delhi:1,Delhi:2}, which uses signed messages with
 $b$-masking quorum systems. In our system, such quorum system is
 constructed from maximal cliques in the trust graph. 
 Clients choose cliques to trust at the registration process, which
@@ -195,12 +198,12 @@ quorum is constructed by the algorithm {\em GetQC}.
   \SetAlgoNoLine
   \KwIn{$G$: a graph, $s$: the start node, $L$: the maximum distrance}
   $queue \leftarrow {(s, 0)}$\;
-  $QC = {}$\;
+  $QC = \{\}$\;
   \Repeat{$queue = \{\}$}
   {
     $(v, d) \leftarrow dequeue()$\;
     \If{$d \ge L$}{break}
-    $QC = QC \cup \text{findMaximalClique}(v)$\;
+    $QC = QC \cup \text{FindMaximalClique}(v)$\;
     \For{each node $n \in v.adj$}
     {
       enqueue($n, d + 1$) if $n$ has not been visited\;
@@ -224,7 +227,9 @@ quorum is constructed by the algorithm {\em GetQC}.
   return $C$
 \end{algorithm}
 
-\subsubsection*{Quorum Certificate}
+\subsubsection*{Quorum Certificates}
+Quorum certificates represent the proof of trustworthy and give
+permissions to clients to mutate the value.
 A quorum certifiate consists of:
 \begin{itemize}
 \item a unique ID
@@ -234,20 +239,20 @@ A quorum certifiate consists of:
 \end{itemize}
 
 Every {\em write} request includes its quorum certificate along with the
-self signed signature over $\langle x, t, v \rangle$. Every member of
-$QC$ verifies the signature and the quorum certificate with quorum
-cliques before it sends back the signed data.
+self signed signature over $\langle x, t, v \rangle$. Each member of
+$QC$ verifies the signature and the quorum certificate with $QC$
+before it sends back the signed transaction.
 
 \begin{algorithm}
   \caption{Verification of Quorum Certifiate}
   \SetAlgoNoLine
-  \KwIn{$QC$}
+  \KwIn{Cert}
   $Clique = FindMaximalClique(self)$\;
   $Counter = 0$\;
-  \For{each $cert \in QC$}
+  \For{each $c \in $ Cert}
   {
-    \If{$cert.Issuer \in Clique$ {\bf and} $Verify(cert.Issuer,
-      cert.Signature)$
+    \If{$c.Issuer \in Clique$ {\bf and} $Verify(c.Issuer,
+      c.Signature)$
     }{
       $Counter$++\;
     }
@@ -264,9 +269,8 @@ cliques before it sends back the signed data.
 When a node is compromised the node can try to make its own cliques
 with made-up colluding nodes. By the algorithm, a node cannot be a
 member of more than one cliques, which means the compromised node has
-to sever links to honest nodes itself and make links with the
-colluding nodes, otherwise the original clique can no longer
-be a member of a quorum.
+to sever links to honest nodes itself to make links with the colluding
+nodes, otherwise the clique can no longer be a member of a quorum.
 
 [ graph ]
 
@@ -359,7 +363,7 @@ signer is the same as the one of the reqeusted data.
   }
 \end{algorithm}
 
-\subsection{Threshold Password Authentication}
+\subsection{Threshold Password Authentication (TPA)}
 \label{threshold}
 The quorum system based on the WoT graph guarantees data
 integrity. The TOFU policy with the quorum certificate prevents
@@ -417,7 +421,7 @@ To get a password authenticated
   $b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q$
   and calculate a session key
   \[ K_i = (Xv^u)^{b_i} \bmod p \]
-  then sends back $(Y_i, B_i, salt, Z_i)$,
+  then sends back $\{Y_i, B_i, salt, Z_i\}$,
   where
   \begin{align*}
     Y_i &= X g^{y_i} \bmod p, \\
@@ -437,7 +441,7 @@ To get a password authenticated
   to $g^{f(i)}$ 
   to get
   \[
-    \prod_{j \in \mathcal{T}}(g^{f(j)})^{\lambda_j} = g^S
+    \prod_{j \in \mathcal{T}}(g^{f(j)})^{\lambda_j} = g^S \bmod p
   \]
 \item Calculate $K_i$ for each quorum member on the client side, such
   that
@@ -448,9 +452,9 @@ To get a password authenticated
   \[
     (P_i, N) = D_{K_i}(Z_i)
   \]
-  Checks if $N = X||B_i$
+  Check if $N = X||B_i$
 \end{enumerate}
-$k$ and $u$ are the SRP parameters, i.e.,
+Throught the protocols, $k$ and $u$ represent the SRP parameters, i.e.,
 \begin{align*}
   k &= H(p, g) \\
   u &= H(X, B_i)
@@ -458,7 +462,7 @@ $k$ and $u$ are the SRP parameters, i.e.,
 We use $\{P_i\}_{i \in \mathcal{T}}$ as a proof which will be
 checked at each server in protocols.
 
-\subsubsection*{Setup}
+\subsubsection*{TPA For Setup}
 Every node in the system has a unique ID and a public / private key
 pair associated with the ID. Some nodes can share the same ID but are
 not likely to share the keys. Each node generates the ID and keys
@@ -487,9 +491,9 @@ update the value associated with the ID.\\
 \item With the proof send the new certificate to a quorum to get a new
   quorum certificate.
 \end{enumerate}
-See ~\ref{register} for the actual protocols.
+See \ref{register} for the actual protocols.
 
-\subsubsection*{Data Secrecy}
+\subsubsection*{TPA For Data Secrecy}
 The system provides a roming encryption service. A user encrypts
 the value at a node then sends the encrypted value to a quorum. He can
 decrypts the value at any node with the password. The password is
@@ -519,12 +523,12 @@ calculated from partial signatures $S_i = M^{d_i} \bmod N$ then
   S = \prod_{i=1}^{n} S_i = M^d \bmod N
 \]
 
-To make the $(n, n)$ threshold scheme a somewhat $(t, n)$ threshold
-scheme, we construct the partial keys recursively. In the following
-tree, if a node (2) is a faulty it will be compensated by other nodes
-(1, 3, 4, 5) for the keys (21, 23, 24, 25) respectively, i.e., $S =
-\prod_{i \in \{1,2,3,4,5\}} S_i \bmod N$ where $S_2 = \prod_{i \in
-  \{21,23,24,25\}} S_i \bmod N$
+To convert the $(n, n)$ threshold scheme to a somewhat $(t, n)$
+threshold scheme, we construct the partial keys recursively. In the
+following tree, if a node (2) is a faulty its key will be compensated
+by other nodes (1, 3, 4, 5) with the keys (21, 23, 24, 25)
+respectively, i.e., $S = \prod_{i \in \{1,2,3,4,5\}} S_i \bmod N$
+where $S_2 = \prod_{i \in \{21,23,24,25\}} S_i \bmod N$.
 
 \begin{tikzpicture}[every node/.style={draw,circle}]
   \node (0) {0}
@@ -540,8 +544,13 @@ tree, if a node (2) is a faulty it will be compensated by other nodes
   child {node(5) {5}};
 \end{tikzpicture}
 
+The number of keys each node needs to keep will be increased
+exponentially as $n - k$ is big. Up to $(10,7)$ threshold seems
+practical.
+
 \subsubsection*{DSA, ECDSA}
-BFTKV implements a DSS threshold scheme introduced by Gennaro et al. \cite{Gennaro}
+BFTKV implements a DSS threshold scheme introduced by Gennaro et
+al. \cite{Gennaro}
 Since the scheme has a restriction such that $n \geq 2t$ in the $(t,
 n)$-threshold scheme, we no longer be able to use the quorum threshold
 for $(t, n)$. But, we follow the protocols between the client and a
@@ -559,10 +568,11 @@ responses. Our signing protocol consists of three phases:
 
 \section{Protocols}
 
-The system uses Phalanx \cite{Delhi:2} for the underlying READ/WRITE
-operations. To maintain a graph for the quorum system, we extend the
-protocols with JOIN/LEAVE. Also REGISTER protocol is used to get
-quorum certificates with the threshold password authentication.
+The system uses Phalanx \cite{Delhi:2} for the underlying {\em
+read/write} operations. To maintain a graph for the quorum system, we
+extend the protocols with {\em join/leave}. Also {\em register}
+protocol is used to get quorum certificates with the threshold
+password authentication.
 
 \begin{quote}
   {\em Notations}:
@@ -587,28 +597,30 @@ quorum certificates with the threshold password authentication.
 
 \subsection{Read / Write}
 \label{rw}
-Read/Write protocols are done between a client ($C$) and a quorum
-($Q$). A quorum is chosen from a quorum system ($QS \subseteq 2^U$)
-which is a subset of the powerset of all nodes ($U$).  To write a
-value $v$ into a variable $x$, we follow the write protocol specified
-in Phalanx.\\
+{\em read/write} protocols are done between a client ($C$) and a
+quorum ($Q$). A quorum is chosen from a quorum system ($QS \subseteq
+2^U$) which is a subset of the powerset of all nodes ($U$).  To write
+a value $v$ into a variable $x$, we follow the write protocol
+specified in Phalanx.\\
 
 [ Write ]
 \begin{align*}
-  C :& \text{ choose a quorum from quorum cliques } Q \in QC \\
-  C \rightarrow Q :& \text{ get timestamp}(x) \\
+  C :& \text{ choose a quorum from quorum cliques} \\
+     & Q \in QC \\
+  C \rightarrow Q :& \text{ {\em get timestamp}}(x) \\
   C \leftarrow Q_i :& \text{ } t_i \\
   C :& \text{ collect } 2b+1 \text{ timestamps: } \\
-     & \text{ } \{t_i\}_{i \in ord(Q')}, |Q'|=2b+1, Q'\subseteq Q \\
+     & \text{ } \{t_i\}_{i \in \mathcal{T}}, |\mathcal{T}|=2b+1,
+       \mathcal{T} \subseteq Q \\
   C :& \text{ choose the maximum timestamp } \\
      & \text{ } t = max(t_i) + 1 \\
-  C \rightarrow Q :& \text{ get signature}(\langle x, t, v, s_C \rangle),\\
+  C \rightarrow Q :& \text{ {\em get signature}}(\langle x, t, v, s_C \rangle),\\
      & \text{ where } s_C = (Sign_C(\langle x, t, v \rangle), Cert_C) \\
   Q_i :& \text{ verify $s_C$ with $C$'s quorum certificates} \\
   Q_i :& \text{ check the TOFU policy} \\
   C \rightarrow Q_i :& \text{ } S_i = \{\langle x, t, v, s_C \rangle\}_{Q_i} \\
   C :& \text{ collect signatures } \\
-     & \text{ } S = \{S_i\}_{i \in ord(Q')}, |Q'| = 2b + 1, Q' \subseteq Q \\
+     & \text{ } S = \{S_i\}_{i \in \mathcal{T}} \\
   C :& \text{ choose a quorum from } Q' = U \setminus QC \\
   C \rightarrow Q' :& \text{ write}(\langle x, t, v, s_C, S \rangle) \\
   Q'_i :& \text{ verify the signature set $S$} \\
@@ -620,41 +632,43 @@ in Phalanx.\\
 \setcounter{equation}{0}
 \begin{align*}
   C &: \text{choose a quorum } Q \in U \setminus QC \\
-  C \rightarrow Q &: \text{read}(x) \\
-  C \leftarrow Q_i &: \langle x, t, v, s_C, S \rangle \\
-  C &: \text{collect } f + 1 \text{responses} \\
+  C \rightarrow Q &: read(x) \\
+  C \leftarrow Q_i &: M_i = \langle x, t, v, s_C, S \rangle \\
+  C &: \text{collect } f + 1 \text{ responses} \\
   C &: \text{verify the signature set $S$} \\
   C &: \text{do the equivocation check} \\
-  C &: \text{choose the latest timestamp } t_L \\
-  [ write back ] \\
-  C &: Q' = Q \setminus \{Q_i | \text{that has not returned } t_L\} \\
-  C \rightarrow Q' &: \text{write back } \langle x, t_L, v, s_C, S \rangle
+  C &: \text{choose the latest timestamp } \\
+    & t_L = max(M_i.t) \\
+    & [ write back ] \\
+  C &: Q' = \{Q_i \subset Q | M_i.t < t_L\} \\
+  C \rightarrow Q' &: \text{{\em write back}}(\langle x, t_L, v, s_C, S \rangle)
 \end{align*}
 
 
 \subsection{Join / Leave}
 Any node can join / leave anytime by sending its quorum certificate to
-a node. The node received the cert verifies it and adds it to the
-local graph which will be returned to the caller node. To leave the
-network, a node broadcasts its quorum certificate to the quorum it
-belongs to.
-A node that has received a graph constructs its own graph from the
-peer graph, then sends the join request to nodes that have not been
-connected.
+nodes it trusts. The node received the request verifies the
+certificate and adds it to the local graph which will be returned to
+the caller node. To leave the network, a node broadcasts its quorum
+certificate to the quorum it belongs to.
+The node that has received the graph constructs its own local graph
+from the graphs, then sends the join request to nodes that have not
+been connected.
 
 \begin{algorithm}
   \caption{Join}
   \SetAlgoNoLine
-  $G.Vertices = Cert.Signatures[].Subject$\;
-  $peers = G.Vertices$\;
+  \KwIn{Cert}
+  $G.V = Cert.sigs[].cert$\;
+  $peers = G.V$\;
   \For{$peers = \bot$}
   {
     \For{$peer \in Peers$}
     {
-      Send $Cert$ to $peer$\;
+      Send $Cert$ to $peer.ID$\;
       $certs = $ Receive()\;
-      $peers = certs \setminus G.Vertices$\;
-      Merge $certs$ to $G$\;
+      $peers = certs \setminus G.V$\;
+      $G.V = G.V \cup certs$\;
     }
   }
 \end{algorithm}
@@ -674,7 +688,7 @@ the authentication when it is finished.
   \SetAlgoNoLine
   \KwIn{$req$: a client certificate, $proof$: the proof of the password
     authentication}
-  $found$ = $Certs[req.ID]$\;
+  $found$ = $Store[req.ID]$\;
   \If{$found \neq \bot$}
   {
     $clique = FindMaximalClique(self)$\;
@@ -691,8 +705,8 @@ We look into attacks against the fundamental property:
 $READ(Q_1,x) = READ(Q_2,x)$ for $\forall Q_1, Q_2 \in QS$, which is
 known as equivocation.  The best that attackers can do is divide a
 clique into two sets and ask each set to sign $\langle x,t,v \rangle$
-and $\langle x,t,v' \rangle$ separately. Then do the WRITE protocol
-for the target nodes with collected signature sets $S$ and
+and $\langle x,t,v' \rangle$ separately. Then do the {\em write}
+protocol for the target nodes with collected signature sets $S$ and
 $S'$. Honest servers will refuse the request because it does not
 satisfy the basic $b$-masking quorum condition: $|S| \geq b+1$. But
 with $b$ colluding nodes, the attack will succeed.
@@ -715,11 +729,12 @@ with $b$ colluding nodes, the attack will succeed.
   \node at (\midangle:\innerpos) {#3};
 }
 
-\begin{tikzpicture}[scale=2]
+\begin{tikzpicture}[scale=1.5]
 
 \newcounter{a}
 \newcounter{b}
-\foreach \p/\t/\l in {40/$H_1$/Honest nodes, 40/$H_2$/Honest nodes, 20/$F$/Faulty nodes}
+\foreach \p/\t/\l in {25//,40/$H_1$/Honest nodes, 20/$F$/Faulty nodes,
+40/$H_2$/Honest nodes}
   {
     \setcounter{a}{\value{b}}
     \addtocounter{b}{\p}
@@ -746,27 +761,42 @@ system can detect malicious actions with the following probability
 when $f > b$ and $|Q| < (f + n)/2$, where $f$ is the number of the
 faulty nodes, assuming the sizes of $H_1$ and $H_2$ are the same.
 
-In the case of $f < b$ the detection rate is always 100\% because it is
+In the case of $f \le b$ the detection rate is always 100\% because it is
 guaranteed that clients can always find a valid value and anything
 other than that is the result of malicious actions. When the number of
 faulty nodes exceeds the threshold, i.e., $f \geq b$, it will be possible that
-the client cannot detect the malicious action. Since the minimum
+the client cannot detect all malicious actions. Since the minimum
 quorum size is $(n-1)/3$ it does not need to consider the case where
 $|Q| < n/3$. Also, if the size exceeds $(f+n)/2$ any quorum always
 includes at least one node from each $H_i$ which makes the detection
 rate 100\%. \\
 
-\begin{tikzpicture}[xscale=7,yscale=7]
-\draw [<->] (0,1.0) -- (0,0) -- (1.0,0);
-\draw[thick, domain=0:0.7] plot (\x, {1-pow(17/200,\x)});
-\draw[thick, domain=0.7:1.0] plot (\x, {1-pow(17/200,0.7)});
+\begin{tikzpicture}[xscale=6,yscale=6]
+  \draw [<->] (0,0.9) -- (0,0) -- (1.0,0);
+  \node [below right] at (1,0) {$|Q|$};
+  \node [left] at (0,{1-pow(17/300,0.7)}) {$1$};
+  \node [left] at (0,0) {$0$};
+  \node [below] at (0.3,0) {$n/3$};
+  \node [below] at (0.7,0) {$(f+n)/2$};
+  \draw[dashed, domain=0:0.3] plot (\x, {1-pow(17/300,\x)});
+  \draw[thick, domain=0.3:0.7] plot (\x, {1-pow(17/300,\x)});
+  \draw[dashed, domain=0.7:1.0] plot (\x, {1-pow(17/300,0.7)});
 \end{tikzpicture}
 
 For example, assume we choose a quorum $|Q| = 3b+1$ out of $n = 4b+1$,
 which is the default setup of the kv quorum system, the detection rate
 is 100\% up to $f = 2b$ failure nodes. \\
 
-[ graph 2 ] \\
+\begin{tikzpicture}[xscale=6,yscale=6]
+  \draw [<->] (0,1.05) -- (0,0) -- (1.05,0);
+  \node [left] at (0,1) {$1$};
+  \node [left] at (0,0) {$0$};
+  \node [below] at (0.3,0) {$n/3$};
+  \node [below] at (0.7,0) {$2n/3$};
+  \node [below] at (1,0) {$n$};
+  \node [right] at (1.05,0) {$f$};
+  \draw[thick, smooth] (0,1) to (0.6,1) to [out=0,in=90] (1,0);
+\end{tikzpicture}
 
 \section{Applications}
 
@@ -851,11 +881,14 @@ concept and make the system less flexible.
 
 \begin{thebibliography}{99}
 
+\bibitem{bitcoin}
+  Satoshi Nakamoto (2008) Bitcoin: A Peer-to-Peer Electronic Cash System
+
 \bibitem{Delhi:1}
-  Malhi, D. and Reiter, M. (1998). Byzantine Quorum Systems.
+  Malhi, D. and Reiter, M. (1998). Byzantine Quorum Systems
 
 \bibitem{Delhi:2}
-  Malhi, D. and Reiter, M. (1998). Secure and Scalable Replication in Phalanx.
+  Malhi, D. and Reiter, M. (1998). Secure and Scalable Replication in Phalanx
 
 \bibitem{Gennaro}
   Gennaro, R., Jarecki, S., Krawczyk, H. and Rabin, T. (1999). Robust
