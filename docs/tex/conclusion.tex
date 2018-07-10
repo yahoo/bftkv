@@ -1,0 +1,44 @@
+\section{Conclusions and Future Work}
+We developed an efficient and secure key-value store. The graph driven
+architecture gives flexibility to the system, which makes it possible
+to join / leave freely without any additional authorization
+mechanism. Unlike other key-value stores, BFTKV provides strong
+encryption and signature schemes with threshold cryptosystem as
+well. It also solves nasty problems like recovering from the key-loss
+situation and supporting multiple devices under the same user ID.
+
+Scalability of bitcoin blockchain is excellent -- you can add as many
+nodes as you want and it will not affect the whole system, but the
+latency and throughput of the whole process is terrible -- it takes
+one hour to settle a transaction.
+On the other hand, BFT type of blockchain settles transactions in a
+range from sub milliseconds to a few seconds, but scaling out is
+difficult. Specifically, with quorum systems we have theoretical lower
+bounds such as $n = 3f + 1$ and we cannot do anything about it.
+
+BFTKV can separate the role of the node into two parts: signing and
+reading / writing, corresponding to the auth quorum and kv quorum for
+load balancing.
+Once a transaction gets a collective signature, the transaction
+can be stored in any way. The only concern is how to know a
+transaction is latest. Each transaction has the timestamp and we can
+easy get the latest $\langle x, t, v \rangle$ corresponding to a $x$
+in a node but we do not know if other nodes might have a newer
+value. BFTKV addresses this issue by a simple quorum system, i.e., as
+long as $\forall Q_1, Q_2 \in QS, |Q_1 \cap Q_2| > f$ holds, at least
+one node in a quorum has the latest value and the client will choose
+that one. This method is simple but it is difficult to scale out. We
+need to collect data from at least $f+1$ nodes, which depends on the
+total number of servers.
+
+Another concern is the number of collective signatures. Increasing the
+number of servers does not help improve the throughput at all, because
+every available server in quorum cliques needs to get invovled in
+the signing process. Also it will increase the number of the
+collective signatures so that each client and kv node needs to verify
+more signatures.
+One of the ideas to address this issue is to use a threshold signature
+to combine the set of collective signatures so that each node verifies
+the signature only once. But we need a dealer for the threshold
+signature scheme and it will contradict the decenteralized concept and
+make the system less flexible.

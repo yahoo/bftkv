@@ -1,0 +1,53 @@
+\section{Applications}
+We discuss some potential appliations of BFTKV.
+
+\subsection{Decenteralized PKI with DKMS}
+
+User authentication is a long-standing problem for end-to-end
+systems. Even if we have semantically secure cryptographic protocols
+to exchange data between users, if it was with a wrong one, the whole
+security system would not make sense. On the other hand, once we have
+a robust user authentication scheme, we can build up many kinds of
+security systems on top of that, such as PGP and Signal. Our goal is
+to construct an infrastructure to exchange public keys that represent
+users' identities. Exchanging public keys can be done in person,
+using a QR code, confirming the fingerprint of public keys, etc. Those
+methods seem to be relevant for some situations, such as sending
+money. Also, public key infrastructures using central authorities,
+such as X.509 which is based on chain of trust, are widely used. A PKI
+like X.509, however, still have a problem when issuing a certificate
+to each end user. CAs issue certificates to corporates, organizations,
+and individuals based on trustworthiness of requesters but for end
+users whose authenticity is not easy to be proven, we have the same
+basic issues. From end users' point of view, blindly relying on a
+central authority based on its authenticity is no longer secure and
+contradict the end-to-end philosophy.
+
+Our proposed PKI does not ``strongly'' rely on central authorities,
+yet it does not require to exchange public keys in person. Here are
+the high level system requirements:
+\begin{itemize}
+\item Scalability -- the system can grow without affecting the current running services
+\item Transparency -- anyone can monitor every system activity
+\item Quantifiability -- security and efficiency can be formally analyzed
+\item Robustness -- the system has to recover from erroneous situations by itself
+\item Privacy -- the system should not reveal unnecessary information about users
+\item Non-interactivity -- a client may not be able to interact peers
+before sending a message. This particular requirement makes it
+difficult to design a system that guarantees the ``what I saw is what
+you see'' concept. SMTP, for example, is not a mutual explicit
+authentication protocol. When an email is encrypted then sent out, if
+it is encrypted with a wrong key, it will be too late -- someone in
+the middle could read the email when the recipient receives the email
+and notice that the encrypted email is not actually for her.
+\end{itemize}
+
+\subsection{Consensus Mechanism for Blockchain Technologies}
+Key-value stores can be suitable to store transactions. Without
+knowing the key it will be difficult to access the value -- in this
+sense it can be less transparent than other ledgers such as hash
+chain. To keep the transactions we can simply use the hash value of
+the whole transaction data. As every transaction should have a public
+key (``address'') and transaction ID in the sense of bitcoin
+Tx, the hash value should be unique. We write the value with
+the WRITE ONCE permission.

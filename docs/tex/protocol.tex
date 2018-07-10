@@ -1,0 +1,134 @@
+\section{Protocols}
+The system uses Phalanx \cite{Delhi:2} for the underlying {\em
+read/write} operations. To maintain a graph for the quorum system, we
+extend the protocols with {\em join/leave}. Also {\em register}
+protocol is used to get quorum certificates with the threshold
+password authentication.
+
+\begin{quote}
+  {\em Notations}:
+  $\langle x, t, v, s_C, S \rangle$ is an ordered set that denotes the protocol
+  data. $s_C$ and $S$ can be omitted.
+  \begin{itemize}
+  \item[$x$] is the variable and an arbitrary length octet string. The variable will
+    be the key on the key-value store.
+  \item[$t$] is the timestamp and a 64-bit non-negative integer. $2^{64}-1$ is
+    a special value to denote that the variable is no longer able to be
+    updated.
+  \item[$v$] is the value and an arbitrary length octet string.
+  \item[$s_C$] is an object of the signature and quorum certificate of a
+    client $C$. $s_C.sig$ is the signature over $\langle x, t, v \rangle$ signed by the
+    private key of $C$. $s_C.cert$ is the quorum certificate of
+    $C$. $s_C.cert.ID$ is the unique ID to identify each node.
+  \item[$S$] is an unordered set of the signature object. Each $S_i
+    \in S$ has the
+    same structure of the $s_C$. The signers must be quorum members.
+  \end{itemize}
+\end{quote}
+
+\subsection{Read / Write}
+\label{rw}
+{\em read/write} protocols are done between a client ($C$) and a
+quorum ($Q$). A quorum is chosen from a quorum system ($QS \subseteq
+2^U$) which is a subset of the powerset of all nodes ($U$).  To write
+a value $v$ into a variable $x$, we follow the write protocol
+specified in Phalanx.\\
+
+[ Write ]
+\begin{align*}
+  C :& \text{ choose a quorum from quorum cliques} \\
+     & Q \in QC \\
+  C \rightarrow Q :& \text{ {\em get timestamp}}(x) \\
+  C \leftarrow Q_i :& \text{ } t_i \\
+  C :& \text{ collect } 2b+1 \text{ timestamps: } \\
+     & \text{ } \{t_i\}_{i \in \mathcal{T}}, |\mathcal{T}|=2b+1,
+       \mathcal{T} \subseteq Q \\
+  C :& \text{ choose the maximum timestamp } \\
+     & \text{ } t = max(t_i) + 1 \\
+  C \rightarrow Q :& \text{ {\em get signature}}(\langle x, t, v, s_C \rangle),\\
+     & \text{ where } s_C = (Sign_C(\langle x, t, v \rangle), Cert_C) \\
+  Q_i :& \text{ verify $s_C$ with $C$'s quorum certificates} \\
+  Q_i :& \text{ check the TOFU policy} \\
+  C \rightarrow Q_i :& \text{ } S_i = \{\langle x, t, v, s_C \rangle\}_{Q_i} \\
+  C :& \text{ collect signatures } \\
+     & \text{ } S = \{S_i\}_{i \in \mathcal{T}} \\
+  C :& \text{ choose a quorum from } Q' = U \setminus QC \\
+  C \rightarrow Q' :& \text{ write}(\langle x, t, v, s_C, S \rangle) \\
+  Q'_i :& \text{ verify the signature set $S$} \\
+  Q'_i :& \text{ do the equivocation check} \\
+  Q'_i :& \text{ store } \langle x, t, v, S_C, S \rangle
+\end{align*}
+
+[ Read ]
+\setcounter{equation}{0}
+\begin{align*}
+  C &: \text{choose a quorum } Q \in U \setminus QC \\
+  C \rightarrow Q &: read(x) \\
+  C \leftarrow Q_i &: M_i = \langle x, t, v, s_C, S \rangle \\
+  C &: \text{collect } f + 1 \text{ responses} \\
+  C &: \text{verify the signature set $S$} \\
+  C &: \text{do the equivocation check} \\
+  C &: \text{choose the latest timestamp } \\
+    & t_L = max(M_i.t) \\
+    & [ write back ] \\
+  C &: Q' = \{Q_i \subset Q | M_i.t < t_L\} \\
+  C \rightarrow Q' &: \text{{\em write back}}(\langle x, t_L, v, s_C, S \rangle)
+\end{align*}
+
+
+\subsection{Join / Leave}
+Any node can join / leave anytime by sending its quorum certificate to
+nodes it trusts. The node received the request verifies the
+certificate and adds it to the local graph which will be returned to
+the caller node. To leave the network, a node broadcasts its quorum
+certificate to the quorum it belongs to.
+The node that has received the graph constructs its own local graph
+from the graphs, then sends the join request to nodes that have not
+been connected.
+
+\begin{algorithm}
+  \caption{Join}
+  \SetAlgoNoLine
+  \KwIn{Cert}
+  $G.V = Cert.sigs[*].cert$\;
+  $peers = G.V$\;
+  \For{$peers = \bot$}
+  {
+    $newPeers = \{\}$\;
+    \For{$peer \in peers$}
+    {
+      Send $Cert$ to $peer.addr$\;
+      $certs = $ Receive()\;
+      $newPeers = newPeers \cup (certs \setminus G.V$)\;
+      $G.V = G.V \cup certs$\;
+    }
+    $peers = newPeers$\;
+  }
+\end{algorithm}
+
+\subsection{Register}
+\label{register}
+Each node generates its own public/private key pair, then sends the
+public key part to a quorum to get a quorum certificate. Each quorum
+member keeps all certificate issued to clients along with a partial
+password secret. If it finds a certificate request that has the same
+ID as one of the stored certificates it will sign it only if the
+password authentication is done. The client will get a ``proof'' of
+the authentication when it is finished.
+
+\begin{algorithm}
+  \caption{Register}
+  \SetAlgoNoLine
+  \KwIn{$req$: a client certificate, $proof$: the proof of the password
+    authentication}
+  $found$ = $Store[req.x]$\;
+  \If{$found \neq \bot$ {\bf and} $req.s_C.ID = found.s_C.ID$}
+  {
+    $clique = FindMaximalClique(self)$\;
+    \If{$proof \subseteq clique$ {\bf and} $|proof| \ge
+      |clique|\cdot2/3$}
+    {
+      $Sign(req)$\;
+    }
+  }
+\end{algorithm}

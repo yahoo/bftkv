@@ -1,0 +1,51 @@
+\section{Introduction}
+How to reach a consensus with Byzantine type failure is the main
+problem of blockchain technologies. Bitcoin blockchain uses PoW with
+incentives \cite{bitcoin}. Majority of public blockchain (or permission-less
+blockchain) has the same type of consensus mechanism. Another type of
+consensus mechanism is to use BFT protocols, which is a major
+mechanism for local/enterprise blockchain (or permissioned
+system). Some PoS type blockchain technologies use BFT as well to
+improve the transaction rate.
+
+The proposed system is based on the Byzantine quorum system introduced
+by Malhi and Reiter \cite{Delhi:1}. We construct a $b$-masking quorum
+system based on Web of Trust graph. We also introduce quorum certificates
+combined with a threshold authentication scheme to protect data from
+unauthorized mutation. Unlike a centeralized PKI such as X.509, quorum
+certificates are verified according to a dynamic graph constructed
+independently at each node. With the strong authentication scheme and
+flexible certificate mechanism, the system allows anyone to join /
+leave the network freely without any authorization process.
+
+Another key aspect of blockchain technologies is the global
+distributed ledger. Bitcoin blockchain uses hash chain -- transactions
+in a specific period are all hashed together with the hash value of
+the previous block. All bitcoin nodes maintain copies of only one
+global chain, i.e., global ledger.
+The proposed system uses a distributed key-value store with the TOFU
+(Trust on First Use) policy, that is, the first use of a key locks out
+others from mutating the value associated with the key. Only the
+user who has written the key-value first will posses the right to
+update the value. Also it supports WRITE ONCE permission which
+gurantees that once a value is written it will never be modified in
+any way. This special permission will be preferable especially for
+blockchain technologies.
+The system does not guarantee absolute consistency. Also the order of
+transactions for different keys does not matter. The system does not
+even provide eventual consistency among individual nodes. Instead, it
+has a property such as: $READ(Q_1, x) = READ(Q_2, x), \forall Q_1, Q_2
+\in QS$, that is, the consistency is established collectively with
+quorum systems.
+
+Smart contracts play an important role in some blockchain technologies
+such as Etherium and Fabric. As the proposed system is a simple
+key-value store, it does not provide a platform for smart contracts at
+the moment. Also, the system itself does not provide any incentive
+mechanism to discourage nodes to do malicious actions, or to encourage
+to participate the consensus process. The system has a robust
+revocation scheme but it does not answer for a question like why would
+one want to run a node? Although all transactions keep a proof of good
+or bad actions for each node therefore it will be straightforward to
+map it to economic incenstives and penalties, we defer fintech
+discussions to an application layer.

@@ -1,0 +1,88 @@
+\section{Background}
+This section describes some existing technologies used in the system.
+
+\subsection{Quorum Systems}
+A variety of quorum systems have been used to manage replicated data /
+storage in distributed systems. We briefly describe the original
+quorum systems and its extension called Byzantine quorum
+systems. Later, we construct a byzantine quorum system based on Web of
+Trust.
+The system defines two operations, {\em read} and {\em write}, between
+a client and a set of servers called a quorum. A quorum system ($QS
+\subseteq 2^U$) is a subset of the powerset of all servers ($U$), and
+it satisfies a property:
+\[
+  \forall Q_1, Q_2 \in QS, Q_1 \cap Q_2 \neq \emptyset
+\]
+\hfill (intersection property)\\
+
+With this property, it is guaranteed that the client always retrieves
+the latest value from at least one server.
+
+Melhi and Reiter \cite{Delhi:1} extend the property to handle
+Byzantine failure:
+\begin{align*}
+  \forall Q_1, Q_2 \in QS, \forall B \in BF, Q_1 \cap Q_2 \nsubseteq B
+\end{align*}
+where $BF \subseteq 2^U$ and $\cup_{B \in BF} B$ is all Byzantine
+failure nodes.
+Especially when $|Q_1 \cap Q_2| \geq 2b+1$, $QS$ is called a $b$-masking
+quorum system. When the client can be dishonet, signed messages are no
+longer trustworthy therefore we rely on the quorum system to avoid
+equivocation (aka double spending in blockchain terms).
+
+\subsection{Web of Trust}
+A web of trust is a directed graph $G = (V, E)$, where $V$ is a set of
+nodes (each of which is a pair of unique ID and public key) and $E$ is a
+set of trust relationship: when $(v_1, v_2) \in E$, $v1$ {\em trusts}
+$v_2$,
+i.e., the certificate of $v2$ includes a signature over its public key
+with the private key of $v_1$. WoT was introduced by PGP to
+authenticate certificates of peers without relying on central
+authorities. We use the same mechanism to authenticate not only
+end-users' certificates but quorum members' as well.
+
+\subsection{Threshold Cryptosystems}
+Threshold cryptosystems play important roles in this system. We use it
+not just for fault-tolerance but for improving security.
+
+Shamir's Shared Secret (SSS) is a major tool to construct threshold
+cryptographic schemes. The system uses SSS for both password
+authentication and DSA / ECDSA signature schemes. Especially for the
+latter, the system uses a threshold siganture scheme introduced by
+Gennaro et al.\ \cite{Gennaro}. For the threshold password
+authentication, the system adopts SRP \cite{srp} with SSS. See
+~\ref{threshold} for the details.
+SSS uses a $t-1$ degree random polynomial on $\mathbb{Z}_q$
+\[
+  f(x) = \sum_{i=0}^{t-1}a_ix^i \bmod q
+\]
+Each {\em share} is $(i, f(i))_{i = 1..n}$. To reconstruct the shared
+secret $f(0)$, calculate lagrange interpolate from $t$ responses out
+of $n$
+\[
+    \lambda_j = \prod_{l \in \mathcal{T} \setminus \{j\}}
+    i_l / (i_l - i_j) \bmod q
+\]
+then we get
+\[
+  f(0) = \sum_{j \in \mathcal{T}} f(j)\lambda_j
+\]
+where $\mathcal{T}$ is a subset of $\{1..n\}$ and $|\mathcal{T}| =
+t$.
+
+To construct a $(t, n)$ threshold scheme, we follow the quorum
+threshold, i.e., $n = |Q|, t = n-b$. But since the method of
+\cite{Gennaro} needs $n \geq 2t$, the quorum threshold cannot
+apply to DSA / ECSA signatures.
+For RSA signatures, it may seem straightforward to apply SSS to the
+RSA signing process such as:
+\[ S = M^{f(0)} = \prod_{i \in \mathcal{T}} M^{f(i)\lambda_i} \bmod N \]
+however, since to calculate $\lambda_i$ we need the multiplicative
+inverse on $\varphi(N)$ which must be kept as secret as the private
+key, we cannot simply appy SSS to RSA signatures. Shoup \cite{shoup}
+solved this problem by getting rid of multiplicative inverse all
+together but it needs a special construction of the RSA parameters,
+which makes it difficult to apply existing keys to the
+method. Therefore we use a simple key hierachy to address this
+issue. See \ref{threshold} for the details.
