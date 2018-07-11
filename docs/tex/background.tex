@@ -72,9 +72,8 @@ where $\mathcal{T}$ is a subset of $\{1..n\}$ and $|\mathcal{T}| =
 t$.
 
 To construct a $(t, n)$ threshold scheme, we follow the quorum
-threshold, i.e., $n = |Q|, t = n-b$. But since the method of
-\cite{Gennaro} needs $n \geq 2t$, the quorum threshold cannot
-apply to DSA / ECSA signatures.
+threshold, i.e., $n = |Q|, t = n-b$.
+
 For RSA signatures, it may seem straightforward to apply SSS to the
 RSA signing process such as:
 \[ S = M^{f(0)} = \prod_{i \in \mathcal{T}} M^{f(i)\lambda_i} \bmod N \]
@@ -86,3 +85,27 @@ together but it needs a special construction of the RSA parameters,
 which makes it difficult to apply existing keys to the
 method. Therefore we use a simple key hierachy to address this
 issue. See \ref{threshold} for the details.
+
+For DSA and ECDSA, SSS has preferable properties because of its
+linearity:
+\begin{align*}
+f(0) + g(0) &= \sum_{i \in \mathcal{T}} (f(i) + g(i)) \lambda_i \\
+f(0) \cdot g(0) &= \sum_{i \in \mathcal{T'}} (f(i) \cdot g(i)) \lambda_i
+\end{align*}
+where
+\begin{align*}
+  f(0) &= \sum_{i \in \mathcal{T}} f(i) \lambda_i \\
+  g(0) &= \sum_{i \in \mathcal{T}} g(i) \lambda_i
+\end{align*}
+$T'$ is a subset of $\{1..n\}$ and $|\mathcal{T'}| = 2t$. These
+properties make it possible to calculate the DSA / ECDSA signature
+$(r, s)$, such that:
+\begin{align*}
+  r &= g^k \bmod p \bmod q\\
+  s &= k^{-1}(x + mr) \bmod q
+\end{align*}
+from partial signatures $(r_i, s_i)$, where
+\begin{align*}
+  r_i &= g^{k_i} \bmod p \bmod q\\
+  s_i &= k_i^{-1}(x_i + mr_i) \bmod q
+\end{align*}

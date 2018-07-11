@@ -13,7 +13,7 @@ members in the clieques to the client node.
 \begin{algorithm}
   \caption{GetQC}
   \SetAlgoNoLine
-  \KwIn{$G$: a graph, $s$: the start node, $L$: the maximum distrance}
+  \KwIn{$G$: a graph, $s$: the start node, $L$: the maximum distance}
   $queue \leftarrow {(s, 0)}$\;
   $QC = \{\}$\;
   \Repeat{$queue = \{\}$}
@@ -218,8 +218,7 @@ share} will be $\langle i, y_i, v, salt \rangle$, where
 \end{align*}
 $p$ and $q$ are prime numbers such that $p = 2q + 1$ (i.e., $p$ is a
 safe prime), $g$ is a generator on $\mathbb{Z}_q$. The random
-polynomial and salt must be generated randomly on each registration
-process.\\
+polynomial and salt must be generated randomly for each password.\\
 
 To get a password authenticated
 \begin{enumerate}
