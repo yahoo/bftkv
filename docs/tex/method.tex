@@ -1,52 +1,28 @@
 \section{Methodology}
+This section describes quorum systems based on the WoT graph, which
+are the main building blocks for our BFT protocols. In order to
+complete the system, threshold cryptography based authentication and
+signature schemes are introduced as well.
+
 \subsection{Quorum Cliques}
 We follow the faulty clients (dishonest writers) scenario described in
 \cite{Delhi:1,Delhi:2}, which uses signed messages with
 $b$-masking quorum systems. In our system, such quorum system is
-constructed from maximal cliques in the trust graph. 
-Clients choose cliques to trust at the registration process, which
-makes trust edges from the client to some member in cliques. Then a
-quorum is constructed by the algorithm {\em GetQC} and clients get
-certificates from the $QC$, which makes trust edges backward from
-members in the clieques to the client node.
+constructed from maximal cliques in the WoT graph.
 
-\begin{algorithm}
-  \caption{GetQC}
-  \SetAlgoNoLine
-  \KwIn{$G$: a graph, $s$: the start node, $L$: the maximum distance}
-  $queue \leftarrow {(s, 0)}$\;
-  $QC = \{\}$\;
-  \Repeat{$queue = \{\}$}
-  {
-    $(v, d) \leftarrow dequeue()$\;
-    \If{$d \ge L$}{break}
-    $QC = QC \cup \text{FindMaximalClique}(v)$\;
-    \For{each node $n \in v.adj$}
-    {
-      enqueue($n, d + 1$) if $n$ has not been visited\;
-    }
-  }
-  Check if $\forall C_1, C_2 \in QC, C_1 \cap C_2 = \emptyset$\;
-  return $QC$
-\end{algorithm}
-
-\begin{algorithm}
-  \caption{FindMaximalClique}
-  \SetAlgoNoLine
-  \KwIn{$s$: the start node}
-  $C \leftarrow {s}$\;
-  \For{$v \in G.V$}
-  {
-    $C = C + {v} \text{ if } (c_i, v) \text{ and } (v, c_i)
-    \text{ for } \forall c_i \in C$\;
-  }
-  \If{$|C| < 4$}{return $\bot$}
-  return $C$
-\end{algorithm}
+If the graph $G$ keeps some cliques and the starting node $s$ has
+outdegree edges to the cliques within the $L$ distrance, i.e.,
+\[
+\exists (s, u) \in G.E, s.t., u \in QC \text{ and } dist(s, u) \le L
+\]
+it will construct a quorum to sign messages. Note that the quorum
+depends on only the graph $G$. There are no other configuration data
+or anything.
+Such graph is constructed from the quorum certificates. 
 
 \subsubsection*{Quorum Certificates}
-Quorum certificates represent the proof of trustworthy and give
-permissions to clients to mutate the value.
+Quorum certificates represent the proof of trustworthy. Each node
+keeps its own quorum certificate along with the private key. 
 A quorum certifiate consists of:
 \begin{itemize}
 \item a unique ID
@@ -54,33 +30,15 @@ A quorum certifiate consists of:
 \item a self signed signature over the ID and public key
 \item a set of signatures signed by Quorum Cliques
 \end{itemize}
+When a node ($n_1$) is signed by another node ($n_2$) an edge is added
+to the WoT graph, i.e., $G.E = G.E \cup \{(n_2, n_1)\}$.
 
+The quorum certificate not only constructs the graph but also gives
+permissions to clients to mutate the value.
 Every {\em write} request includes its quorum certificate along with the
 self signed signature over $\langle x, t, v \rangle$. Each member of
-$QC$ verifies the signature and the quorum certificate with $QC$
-before it sends back the signed transaction.
-
-\begin{algorithm}
-  \caption{Verification of Quorum Certifiate}
-  \SetAlgoNoLine
-  \KwIn{Cert}
-  $Clique = FindMaximalClique(self)$\;
-  $Counter = 0$\;
-  \For{each $c \in $ Cert}
-  {
-    \If{$c.Issuer \in Clique$ {\bf and} $Verify(c.Issuer,
-      c.Signature)$
-    }{
-      $Counter$++\;
-    }
-  }
-  \eIf{$Counter > 2 \cdot |Clique| / 3$}
-  {
-    return $True$\;
-  }{
-    return $False$\;
-  }
-\end{algorithm}
+$QC$ verifies the signature and the quorum certificate before it sends
+back the signed message.
 
 \subsubsection*{Sybil Attack}
 When a node is compromised the node can try to make its own cliques
@@ -96,21 +54,6 @@ Quorum cliques are responsible for signing data collectively. Data is
 valid only when it has sufficient number of signatures from the
 cliques. 
 
-\begin{algorithm}
-  \caption{Verification of Signature Sets}
-  \SetAlgoNoLine
-  \KwIn{$S = \{S_i\}, S_i = Sign_{Q_i}(\langle x, t, v, s_C \rangle)$}
-  $Cliques = FindMaximalCliques(self)$\;
-  \For{$clique \in Cliques$}
-  {
-    \If{not $VerifySS(clique, S)$}
-    {
-      return $False$\;
-    }
-  }
-  return $True$\;
-\end{algorithm}
-
 Once data is signed it can be sent to other nodes that trust the same
 quorum cliques. Such nodes can form another quorum system and we call
 it {\em KV quorum}. The only purpose of this quorum system is to make
@@ -123,7 +66,11 @@ from $U \setminus QC$ for load balancing.
 The client collects $f + 1$ responses and choose the latest data which
 has the biggest timestamp. If some servers return an old value or {\em
   nil} the client will write back the latest value to those
-servers. See ~\ref{rw} for the actual protocols.
+servers.
+\ifdefined\ABSTRACT
+\else
+See ~\ref{rw} for the actual protocols.
+\fi
 
 Each member of {\em KV quorum} must check equivocation and the
 permission of mutation (TOFU), when it receives the signed
@@ -141,44 +88,17 @@ clients when it detects a client signing different values with the
 same timestamp as well. Once a node is revoked, the node will be
 excluded from the graph and there is no way to restore it.
 
-Every node checks if a node has signed both over $\langle x, t, v,
-s_C \rangle$
-and $\langle x, t, v', s'_C \rangle$ where $v \neq v'$. If a node
-finds such signature in $S$, the node immidiately revokes the signer.
-\begin{algorithm}
-  \caption{Equivocation Check}
-  \SetAlgoNoLine
-  \KwIn{$req = \langle x, t, v, s_C, S \rangle$}
-  $z = ReadT(t)$\;
-  \If{$z \neq \bot$ {\bf and} $req.v \neq z.v$}
-  {
-    $Revoke(req.S \cap z.S)$\;
-  }
-\end{algorithm}
+Every node in the KV quorum checks if there is a node ($\in QC$) has
+signed both $\langle x, t, v, s_C \rangle$ and $\langle x, t, v', s'_C
+\rangle$ where $v \neq v'$.
+If the node finds such signature in $S$, it must immidiately revoke
+the signer.
 
 \subsubsection*{TOFU Policy}
 The system enforces the TOFU policy on every write request. If the
-slot is empty $Q_i$ will simply store the data. If the slot already
-has data, $Q_i$ first retrieve the latest data and check if the
-signer is the same as the one of the reqeusted data.
-\begin{algorithm}
-  \caption{TOFU enforcement}
-  \SetAlgoNoLine
-  \KwIn{$req = \langle x, t, v, s_C, S \rangle$}
-  Verify $req.s_C$ with quorum certificate\;
-  \eIf{$Store[x] = \bot$\;
-  }{
-    $Store[req.x] = req$\;
-  }{
-    $last$ = $ReadT$($t - 1$)\;
-    \eIf{$last.s_C.cert.ID$ = $req.s_C.cert.ID$\;
-    }{
-      $Store[req.x] = req$\;
-    }{
-      Error\;
-    }
-  }
-\end{algorithm}
+slot is empty nodes in the KV quorum will simply store the data. If
+the slot already has data, they first retrieve the latest data and
+check if the signer is the same as the one of the requested data.
 
 \subsection{Threshold Password Authentication (TPA)}
 \label{threshold}
@@ -197,9 +117,9 @@ authentication for:
 
 The system employes a threshold password authentication scheme which
 is immune from offline dictionary attacks (as long as the number of
-compromised servers is less than the threshold). We use SSS to split
-the password secret and SRP \cite{srp} for the authentication
-protocol.\\
+compromised servers is less than the threshold). We use Shamir's
+Secret Sharing (SSS) to split the password secret and SRP \cite{srp}
+for the authentication protocol.\\
 
 To set up the {\em shares} the client generates a random polynomial
 for $(t, n)$ SSS on a prime field $\mathbb{Z}_q$, s.t.,
@@ -213,8 +133,8 @@ share} will be $\langle i, y_i, v, salt \rangle$, where
   y_i &= f(i) + g^{\pi'} \bmod q \\
   v &= g^x \bmod p \\
   x &= \pi g^S \bmod q \\
-  \pi &= Int(h(salt, password)) \bmod p \\
-  \pi' &= Int(h(password)) \bmod q
+  \pi &= \text{OS2I}(h(salt, password)) \bmod p \\
+  \pi' &= \text{OS2I}(h(password)) \bmod q
 \end{align*}
 $p$ and $q$ are prime numbers such that $p = 2q + 1$ (i.e., $p$ is a
 safe prime), $g$ is a generator on $\mathbb{Z}_q$. The random
@@ -278,7 +198,7 @@ Throughout the protocols, $k$ and $u$ represent the SRP parameters, i.e.,
 We use $\{P_i\}_{i \in \mathcal{T}}$ as a proof which will be
 checked at each server in some protocols.
 
-\subsubsection*{TPA For Setup}
+\subsubsection*{TPA for Enrollment}
 Every node in the system has a unique ID and a public / private key
 pair associated with the ID. Some nodes can share the same ID but are
 not likely to share the keys. Each node generates the ID and keys
@@ -289,7 +209,7 @@ when the user wants to register multiple devices under the
 same ID. It also acts as a recovery key when a node has lost the
 key. As long as the user remembers the password he can generates a
 brand new key pair with the same ID and register it so that he can
-update the value associated with the ID.\\
+update the values associated with the ID.\\
 
 \noindent
 {\em Enrollment:}
@@ -307,10 +227,14 @@ update the value associated with the ID.\\
 \item With the proof send the new certificate to a quorum to get a new
   quorum certificate.
 \end{enumerate}
+\ifdefined\ABSTRACT
+\else
 See \ref{register} for the actual protocols.
+\fi
 
-\subsubsection*{TPA For Data Secrecy}
-The system provides a roming encryption service. A user encrypts
+
+\subsubsection*{TPA for Data Secrecy}
+The system provides a roaming encryption service. A user encrypts
 the value at a node then sends the encrypted value to a quorum. He can
 decrypts the value at any node with the password. The password is
 stored with $\langle x, t, v \rangle$ in the way of the {\em threshold
@@ -324,20 +248,37 @@ process first to get the proof. With the proof the client proceeds the
 {\em read} process and decrypts the value with the above key.
 
 \subsection{Distributed Signing}
+Most crypto-currency systems use simple digital signature schemes to
+sign transactions. If private keys are stolen all assets can be
+transferred to someone's address without an authorization of the
+original users. One of the means to mitigate such situation is to use
+{\em multi-sig}. With the multi-sig scheme multiple parties need to be
+involved in the signning process. Most systems adopt multi-sig as an
+add-on security measure to the blockchain technologies. BFTKV
+nativelly supports distributed signing schemes based on threshold
+cryptography, which is compatible with the standard algorithms
+therefore the verifiers do not need to change any way to process the
+transactions.
+
+As a PKI platform, protecting CA's private keys must be the most
+important {\em feature}. At the same time, certificate signing
+requests should be processed quickly and automatically. The
+distributed signing feature satisfies those mandate requirements.
+
 The system takes advantages of the distributed platform to make a
 signature without revealing the private key. Once the key is
-distributed among quorum members, the completed private key will never
-appear at any node. The system supports three threshold signature
-algorithms: RSA (PKCS1.5), DSA and ECDSA. Our scheme takes existing
-keys as-is and distributes it to multiple servers, which makes the
-system an ideal CA. Also Distributed signing is essential for
-blockchain wallets.
+distributed among quorum members, the complete private key will never
+appear at any server or client. The system supports three threshold
+signature algorithms: RSA (PKCS1.5), DSA and ECDSA. Our scheme takes
+existing keys as-is and distributes it to multiple servers, which
+makes it easy to migrate.
 
 \subsubsection*{RSA}
-It is easy to construct a $(n, n)$ ``threshold'' scheme on RSA
-\cite{garay}. Decompose the private key $d$ into $d_i, i = 1..n$ such
-that $d = \sum_{i=1}^{n} d_i \bmod \varphi(N)$, and the signature is
-calculated from partial signatures $S_i = M^{d_i} \bmod N$ then
+It is straightforward to construct a $(n, n)$ ``threshold'' scheme on
+RSA \cite{garay,rabin}. Decompose the private key $d$ into $\{d_i\}_{i =
+1..n} \; s.t., d = \sum_{i=1}^{n} d_i \bmod \varphi(N)$, and the
+signature is calculated from partial signatures $S_i = M^{d_i} \bmod
+N$ then
 \[
   S = \prod_{i=1}^{n} S_i = M^d \bmod N
 \]

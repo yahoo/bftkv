@@ -9,16 +9,20 @@
 \renewcommand{\theequation}{\arabic{equation}}
 \usepackage[ruled]{algorithm2e}
 \usepackage{tikz}
+\usepackage{hyperref}
 
-\title{A Byzantine Fault-tolerant KV Store for Blockchain}
+\title{A Byzantine Fault-tolerant KV Store for Decentralized PKI and Blockchain}
 \author{%
-  \textsc{Ryuji Ishiguro}
+  \textsc{Ryuji Ishiguro}\\%
 }
 \date{\today}
 
 \usepackage{titling} % Customizing the title section
 \usepackage{abstract} % Allows abstract customization
 \renewcommand{\maketitlehookd}{%
+  \begin{center}
+    \url{https://github.com/yahoo/bftkv}
+  \end{center}
   \input{abstract}
 }
 
@@ -43,5 +47,7 @@
 \input{ref}
 
 \input{ack}
+
+\input{algo}
 
 \end{document}

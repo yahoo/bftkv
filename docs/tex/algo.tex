@@ -1,0 +1,146 @@
+\section*{Algorithms}
+%
+% algorithms
+%
+\begin{algorithm}
+  \caption{GetQC}
+  \SetAlgoNoLine
+  \KwIn{$G$: a graph, $s$: the start node, $L$: the maximum distance}
+  $queue \leftarrow {(s, 0)}$\;
+  $QC = \{\}$\;
+  \Repeat{$queue = \{\}$}
+  {
+    $(v, d) \leftarrow dequeue()$\;
+    \If{$d \ge L$}{break}
+    $QC = QC \cup \text{FindMaximalClique}(v)$\;
+    \For{each node $n \in v.adj$}
+    {
+      enqueue($n, d + 1$) if $n$ has not been visited\;
+    }
+  }
+  Check if $\forall C_1, C_2 \in QC, C_1 \cap C_2 = \emptyset$\;
+  return $QC$
+\end{algorithm}
+
+\begin{algorithm}
+  \caption{FindMaximalClique}
+  \SetAlgoNoLine
+  \KwIn{$G$: a graph, $s$: the start node}
+  $C \leftarrow {s}$\;
+  \For{$v \in G.V$}
+  {
+    $C = C + {v} \text{ if } (c_i, v) \text{ and } (v, c_i)
+    \text{ for } \forall c_i \in C$\;
+  }
+  \If{$|C| < 4$}{return $\bot$}
+  return $C$
+\end{algorithm}
+
+\begin{algorithm}
+  \caption{Verification of Signature Sets}
+  \SetAlgoNoLine
+  \KwIn{$S = \{S_i\}, S_i = Sign_{Q_i}(\langle x, t, v, s_C \rangle)$}
+  $Cliques = FindMaximalCliques(self)$\;
+  \For{$clique \in Cliques$}
+  {
+    \If{not $VerifySS(clique, S)$}
+    {
+      return $False$\;
+    }
+  }
+  return $True$\;
+\end{algorithm}
+
+\begin{algorithm}
+  \caption{Verification of Quorum Certifiate}
+  \SetAlgoNoLine
+  \KwIn{Cert}
+  $Clique = FindMaximalClique(self)$\;
+  $Counter = 0$\;
+  \For{each $c \in $ Cert}
+  {
+    \If{$c.Issuer \in Clique$ {\bf and} $Verify(c.Issuer,
+      c.Signature)$
+    }{
+      $Counter$++\;
+    }
+  }
+  \eIf{$Counter > 2 \cdot |Clique| / 3$}
+  {
+    return $True$\;
+  }{
+    return $False$\;
+  }
+\end{algorithm}
+
+\begin{algorithm}
+  \caption{Equivocation Check}
+  \SetAlgoNoLine
+  \KwIn{$req = \langle x, t, v, s_C, S \rangle$}
+  $z = Store[x, t]$\;
+  \If{$z \neq \bot$ {\bf and} $req.v \neq z.v$}
+  {
+    $Revoke(req.S \cap z.S)$\;
+  }
+\end{algorithm}
+
+\begin{algorithm}
+  \caption{TOFU enforcement}
+  \SetAlgoNoLine
+  \KwIn{$req = \langle x, t, v, s_C, S \rangle$}
+  Verify $req.s_C$ with quorum certificate\;
+  \eIf{$Store[x, 0] = \bot$\;
+  }{
+    $Store[x, t] = req$\;
+  }{
+    $last = Store[x, t-1]$\;
+    \eIf{$last.s_C.cert.ID$ = $req.s_C.cert.ID$\;
+    }{
+      $Store[x, t] = req$\;
+    }{
+      Error\;
+    }
+  }
+\end{algorithm}
+
+\ifdefined\ABSTRACT
+\else
+
+\begin{algorithm}
+  \caption{Join}
+  \SetAlgoNoLine
+  \KwIn{Cert}
+  $G.V = Cert.sigs[*].cert$\;
+  $peers = G.V$\;
+  \For{$peers = \bot$}
+  {
+    $newPeers = \{\}$\;
+    \For{$peer \in peers$}
+    {
+      Send $Cert$ to $peer.addr$\;
+      $certs = $ Receive()\;
+      $newPeers = newPeers \cup (certs \setminus G.V$)\;
+      $G.V = G.V \cup certs$\;
+    }
+    $peers = newPeers$\;
+  }
+\end{algorithm}
+
+\begin{algorithm}
+  \caption{Register}
+  \SetAlgoNoLine
+  \KwIn{$req$: a client certificate, $proof$: the proof of the password
+    authentication}
+  $found$ = $Store[req.x]$\;
+  \If{$found \neq \bot$ {\bf and} $req.s_C.ID = found.s_C.ID$}
+  {
+    $clique = FindMaximalClique(self)$\;
+    \If{$proof \subseteq clique$ {\bf and} $|proof| \ge
+      |clique|\cdot2/3$}
+    {
+      $Sign(req)$\;
+    }
+  }
+\end{algorithm}
+
+\fi

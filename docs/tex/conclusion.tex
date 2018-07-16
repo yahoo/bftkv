@@ -1,4 +1,8 @@
+\ifdefined\ABSTRACT
+\section{Conclusions}
+\else
 \section{Conclusions and Future Work}
+\fi
 We developed an efficient and secure key-value store. The graph driven
 architecture gives flexibility to the system, which makes it possible
 to join / leave freely without any additional authorization
@@ -7,6 +11,8 @@ encryption and signature schemes with threshold cryptosystem as
 well. It also solves nasty problems like recovering from the key-loss
 situation and supporting multiple devices under the same user ID.
 
+\ifdefined\ABSTRACT
+\else
 Scalability of bitcoin blockchain is excellent -- you can add as many
 nodes as you want and it will not affect the whole system, but the
 latency and throughput of the whole process is terrible -- it takes
@@ -22,7 +28,7 @@ load balancing.
 Once a transaction gets a collective signature, the transaction
 can be stored in any way. The only concern is how to know a
 transaction is latest. Each transaction has the timestamp and we can
-easy get the latest $\langle x, t, v \rangle$ corresponding to a $x$
+easily get the latest $\langle x, t, v \rangle$ corresponding to a $x$
 in a node but we do not know if other nodes might have a newer
 value. BFTKV addresses this issue by a simple quorum system, i.e., as
 long as $\forall Q_1, Q_2 \in QS, |Q_1 \cap Q_2| > f$ holds, at least
@@ -40,5 +46,6 @@ more signatures.
 One of the ideas to address this issue is to use a threshold signature
 to combine the set of collective signatures so that each node verifies
 the signature only once. But we need a dealer for the threshold
-signature scheme and it will contradict the decenteralized concept and
+signature scheme and it will contradict the decentralized concept and
 make the system less flexible.
+\fi

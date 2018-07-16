@@ -1,22 +1,25 @@
 \section{Introduction}
 How to reach a consensus with Byzantine type failure is the main
-problem of blockchain technologies. Bitcoin blockchain uses PoW with
-incentives \cite{bitcoin}. Majority of public blockchain (or permission-less
-blockchain) has the same type of consensus mechanism. Another way to
-establish a consensus is to use BFT protocols, which is a major
-mechanism for local/enterprise blockchain (or permissioned
-system). Some PoS type blockchain technologies use BFT as well to
-improve the transaction rate.
+problem of blockchain technologies. Bitcoin blockchain uses PoW (Proof
+of Work) with incentives \cite{bitcoin}. Majority of public blockchain
+(or permission-less blockchain) has the same type of consensus
+mechanism. Another way to establish a consensus is to use BFT
+(Byzantine Fault-Tolerant) protocols, which is a major mechanism for
+local/enterprise blockchain (or permissioned system). Some PoS (Proof
+of Stake) type blockchain technologies use BFT as well to improve the
+transaction rate.
 
 The proposed system is based on the Byzantine quorum system introduced
-by Malhi and Reiter \cite{Delhi:1}. We construct a $b$-masking quorum
-system based on Web of Trust graph. We also introduce quorum certificates
-combined with a threshold authentication scheme to protect data from
-unauthorized mutation. Unlike a centeralized PKI such as X.509, quorum
-certificates are verified according to a dynamic graph constructed
-independently at each node. With the strong authentication scheme and
-flexible certificate mechanism, the system allows anyone to join /
-leave the network freely without any authorization process.
+by Malhi and Reiter \cite{Delhi:1}, and a BFT protocol proposed by the
+same authors \cite{Delhi:2}. We construct a $b$-masking quorum system
+based on WoT (Web of Trust) graph. We also introduce quorum
+certificates combined with a threshold authentication scheme to
+protect data from unauthorized mutation. Unlike a centralized PKI such
+as X.509, quorum certificates are verified according to a dynamic
+graph constructed independently at each node. With the strong
+authentication scheme and flexible certificate mechanism, the system
+allows anyone to join / leave the network freely without any
+authorization process.
 
 Another key aspect of blockchain technologies is the global
 distributed ledger. Bitcoin blockchain uses hash chain -- transactions
@@ -28,9 +31,9 @@ The proposed system uses a distributed key-value store with the TOFU
 others from mutating the value associated with the key. Only the
 user who has written the key-value first will posses the right to
 update the value. Also it supports WRITE ONCE permission which
-gurantees that once a value is written it will never be modified in
-any way. This special permission will be preferable especially for
-blockchain technologies.
+guarantees that once a value is written it will never be modified in
+any way. This special permission will be preferable for applications
+like the global ledger which must be tamper-proof.
 The system does not guarantee absolute consistency. Also the order of
 transactions for different keys does not matter. The system does not
 even provide eventual consistency among individual nodes. Instead, it

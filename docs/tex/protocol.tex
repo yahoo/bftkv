@@ -86,26 +86,6 @@ The node that has received the graph constructs its own local graph
 from the graphs, then sends the join request to nodes that have not
 been connected.
 
-\begin{algorithm}
-  \caption{Join}
-  \SetAlgoNoLine
-  \KwIn{Cert}
-  $G.V = Cert.sigs[*].cert$\;
-  $peers = G.V$\;
-  \For{$peers = \bot$}
-  {
-    $newPeers = \{\}$\;
-    \For{$peer \in peers$}
-    {
-      Send $Cert$ to $peer.addr$\;
-      $certs = $ Receive()\;
-      $newPeers = newPeers \cup (certs \setminus G.V$)\;
-      $G.V = G.V \cup certs$\;
-    }
-    $peers = newPeers$\;
-  }
-\end{algorithm}
-
 \subsection{Register}
 \label{register}
 Each node generates its own public/private key pair, then sends the
@@ -115,20 +95,3 @@ password secret. If it finds a certificate request that has the same
 ID as one of the stored certificates it will sign it only if the
 password authentication is done. The client will get a ``proof'' of
 the authentication when it is finished.
-
-\begin{algorithm}
-  \caption{Register}
-  \SetAlgoNoLine
-  \KwIn{$req$: a client certificate, $proof$: the proof of the password
-    authentication}
-  $found$ = $Store[req.x]$\;
-  \If{$found \neq \bot$ {\bf and} $req.s_C.ID = found.s_C.ID$}
-  {
-    $clique = FindMaximalClique(self)$\;
-    \If{$proof \subseteq clique$ {\bf and} $|proof| \ge
-      |clique|\cdot2/3$}
-    {
-      $Sign(req)$\;
-    }
-  }
-\end{algorithm}
