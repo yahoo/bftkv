@@ -6,13 +6,13 @@ of Work) with incentives \cite{bitcoin}. Majority of public blockchain
 mechanism. Another way to establish a consensus is to use BFT
 (Byzantine Fault-Tolerant) protocols, which is a major mechanism for
 local/enterprise blockchain (or permissioned system). Some PoS (Proof
-of Stake) type blockchain technologies use BFT as well to improve the
-transaction rate.
+of Stake) type blockchain technologies use BFT as well to avoid the
+mining process.
 
 The proposed system is based on the Byzantine quorum system introduced
 by Malhi and Reiter \cite{Delhi:1}, and a BFT protocol proposed by the
 same authors \cite{Delhi:2}. We construct a $b$-masking quorum system
-based on WoT (Web of Trust) graph. We also introduce quorum
+based on the WoT (Web of Trust) graph. We also introduce quorum
 certificates combined with a threshold authentication scheme to
 protect data from unauthorized mutation. Unlike a centralized PKI such
 as X.509, quorum certificates are verified according to a dynamic
@@ -24,8 +24,8 @@ authorization process.
 Another key aspect of blockchain technologies is the global
 distributed ledger. Bitcoin blockchain uses hash chain -- transactions
 in a specific period are all hashed together with the hash value of
-the previous block. All bitcoin nodes maintain copies of only one
-global chain, i.e., global ledger.
+the previous block. All bitcoin nodes maintain the same view of the
+hash chain.
 The proposed system uses a distributed key-value store with the TOFU
 (Trust on First Use) policy, that is, the first use of a key locks out
 others from mutating the value associated with the key. Only the

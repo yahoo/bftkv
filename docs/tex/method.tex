@@ -4,19 +4,19 @@ are the main building blocks for our BFT protocols. Protocols are
 always between a client and a quorum. To write a key-value pair, the
 client issues a request to sign the messages to {\em Quorum Cliques},
 then with the set of signatures it issues another request to {\em KV
-  quorum}:
+  quorum} to actually store the key-value:
 \ifdefined\ABSTRACT
 \footnote{Detailed protocols are described in the full paper.}
 \fi
 \begin{enumerate}
-\item Collect signatures from {\em Quorum Cliques}
-\item Write a message with the collective signature to {\em
+\item Collect signatures over a message from {\em Quorum Cliques}
+\item Send the message with the collective signature to {\em
     KV quorum}
 \end{enumerate}
 To read a key-value pair, the client issues a {\em read}
-request to a KV quorum:
+request to a {\em KV quorum}:
 \begin{enumerate}
-\item Collect key-value pairs from a KV quorum
+\item Collect key-value pairs from a {\em KV quorum}
 \item Choose the latest one
 \end{enumerate}
 \ifdefined\ABSTRACT

@@ -79,15 +79,14 @@ RSA signing process such as:
 \[ S = M^{f(0)} = \prod_{i \in \mathcal{T}} M^{f(i)\lambda_i} \bmod N \]
 however, since to calculate $\lambda_i$ we need the multiplicative
 inverse on $\varphi(N)$ which must be kept as secret as the private
-key, we cannot simply appy SSS to RSA signatures. Shoup \cite{shoup}
-solved this problem by getting rid of multiplicative inverse all
-together but it needs a special construction of the RSA parameters,
-which makes it difficult to apply existing keys to the
+key, we cannot simply appy SSS to RSA signatures. Shoup,
+V. \cite{shoup} solved this problem by getting rid of multiplicative
+inverse all together but it needs a special construction of the RSA
+parameters, which makes it difficult to apply existing keys to the
 method. Therefore we use a simple key hierachy to address this
 issue. See \ref{threshold} for the details.
 
-For DSA and ECDSA, SSS has preferable properties because of its
-linearity:
+For DSA and ECDSA, SSS has preferable properties due to its linearity:
 \begin{align*}
 f(0) + g(0) &= \sum_{i \in \mathcal{T}} (f(i) + g(i)) \lambda_i \\
 f(0) \cdot g(0) &= \sum_{i \in \mathcal{T'}} (f(i) \cdot g(i)) \lambda_i
