@@ -37,12 +37,12 @@ like the global ledger which must be tamper-proof.
 The system does not guarantee absolute consistency. Also the order of
 transactions for different keys does not matter. The system does not
 even provide eventual consistency among individual nodes. Instead, it
-has a property such as: $READ(Q_1, x) = READ(Q_2, x), \forall Q_1, Q_2
-\in QS$, that is, the consistency is established collectively with
-quorum systems.
+has a property such that: $READ(Q_1, x) = READ(Q_2, x), \forall Q_1,
+Q_2 \in QS$, that is, the consistency is established collectively with
+a quorum system ($QS$).
 
 Smart contracts play an important role in some blockchain technologies
-such as Etherium and Fabric. As the proposed system is a simple
+such as Ethereum and Hyperledger Fabric. As the proposed system is a simple
 key-value store, it does not provide a platform for smart contracts at
 the moment. Also, the system itself does not provide any incentive
 mechanism to discourage nodes to do malicious actions, or to encourage

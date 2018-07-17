@@ -1,20 +1,45 @@
 \section{Methodology}
 This section describes quorum systems based on the WoT graph, which
-are the main building blocks for our BFT protocols. In order to
-complete the system, threshold cryptography based authentication and
-signature schemes are introduced as well.
+are the main building blocks for our BFT protocols. Protocols are
+always between a client and a quorum. To write a key-value pair, the
+client issues a request to sign the messages to {\em Quorum Cliques},
+then with the set of signatures it issues another request to {\em KV
+  quorum}:
+\ifdefined\ABSTRACT
+\footnote{Detailed protocols are described in the full paper.}
+\fi
+\begin{enumerate}
+\item Collect signatures from {\em Quorum Cliques}
+\item Write a message with the collective signature to {\em
+    KV quorum}
+\end{enumerate}
+To read a key-value pair, the client issues a {\em read}
+request to a KV quorum:
+\begin{enumerate}
+\item Collect key-value pairs from a KV quorum
+\item Choose the latest one
+\end{enumerate}
+\ifdefined\ABSTRACT
+\else
+See the section \ref{Protocols} below for details.
+\fi
+
+In order to complete the system, threshold cryptography based
+authentication and signature schemes are introduced as well.
 
 \subsection{Quorum Cliques}
 We follow the faulty clients (dishonest writers) scenario described in
-\cite{Delhi:1,Delhi:2}, which uses signed messages with
-$b$-masking quorum systems. In our system, such quorum system is
-constructed from maximal cliques in the WoT graph.
+``Byzantine Quorum Systems'' \cite{Delhi:1,Delhi:2}, which uses signed
+messages with $b$-masking quorum systems. In our system, such quorum
+system is constructed from maximal cliques in the WoT graph.
 
 If the graph $G$ keeps some cliques and the starting node $s$ has
 outdegree edges to the cliques within the $L$ distrance, i.e.,
 \[
-\exists (s, u) \in G.E, s.t., u \in QC \text{ and } dist(s, u) \le L
+\exists (s, u) \in G.E, s.t., u \in QC \text{ and } dist(s, u) \le L \\
 \]
+where $QC$ is quorum cliques obtained by the algorithm {\em GetQC}
+\ref{GetQC},
 it will construct a quorum to sign messages. Note that the quorum
 depends on only the graph $G$. There are no other configuration data
 or anything.
@@ -35,17 +60,21 @@ to the WoT graph, i.e., $G.E = G.E \cup \{(n_2, n_1)\}$.
 
 The quorum certificate not only constructs the graph but also gives
 permissions to clients to mutate the value.
-Every {\em write} request includes its quorum certificate along with the
-self signed signature over $\langle x, t, v \rangle$. Each member of
-$QC$ verifies the signature and the quorum certificate before it sends
-back the signed message.
+Every {\em write} request includes the client's quorum certificate
+along with the self signed signature over $\langle x, t, v
+\rangle$. Each member of $QC$ verifies the signature and the quorum
+certificate before it sends back the signed message. See algorithms
+{\em CheckSigs} \ref{CheckSigs} and {\em
+  CheckQuorumCert} \ref{CheckQuorumCert}.
+
 
 \subsubsection*{Sybil Attack}
 When a node is compromised the node can try to make its own cliques
-with made-up colluding nodes. By the algorithm, a node cannot be a
-member of more than one cliques, which means the compromised node has
-to sever links to honest nodes itself to make links with the colluding
-nodes, otherwise the clique can no longer be a member of a quorum.
+with made-up colluding nodes. By the algorithm {\em GetQC}
+\ref{GetQC}, a node cannot be a member of more than one cliques, which
+means the compromised node has to sever links to honest nodes itself
+to make links with the colluding nodes, otherwise the clique can no
+longer be a member of a quorum.
 
 [ graph ]
 
@@ -57,16 +86,12 @@ cliques.
 Once data is signed it can be sent to other nodes that trust the same
 quorum cliques. Such nodes can form another quorum system and we call
 it {\em KV quorum}. The only purpose of this quorum system is to make
-sure that clients can retrieve the latest key-value (which has the
-largest timestamp in the system). {\em KV quorum} is typically chosen
-from $U \setminus QC$ for load balancing.
+sure that clients can retrieve the latest key-value. {\em KV quorum}
+is typically chosen from $U\; \setminus\; QC$ for load balancing.
 
-[ graph of cliques and kv quorums ]
-
-The client collects $f + 1$ responses and choose the latest data which
+The client collects $f + 1$ responses and chooses the latest data which
 has the biggest timestamp. If some servers return an old value or {\em
-  nil} the client will write back the latest value to those
-servers.
+  nil} the client will write back the latest value to those servers.
 \ifdefined\ABSTRACT
 \else
 See ~\ref{rw} for the actual protocols.
@@ -93,14 +118,16 @@ signed both $\langle x, t, v, s_C \rangle$ and $\langle x, t, v', s'_C
 \rangle$ where $v \neq v'$.
 If the node finds such signature in $S$, it must immidiately revoke
 the signer.
+See algorithm {\em CheckEquivocation} \ref {CheckEquivocation}.
 
 \subsubsection*{TOFU Policy}
 The system enforces the TOFU policy on every write request. If the
 slot is empty nodes in the KV quorum will simply store the data. If
 the slot already has data, they first retrieve the latest data and
 check if the signer is the same as the one of the requested data.
+See algorithm {\em CheckTOFU} \ref{CheckTOFU}.
 
-\subsection{Threshold Password Authentication (TPA)}
+\subsection{Threshold Password Authentication ($\mathcal{TPA}$)}
 \label{threshold}
 The quorum system based on the WoT graph guarantees data
 integrity. The TOFU policy with the quorum certificate prevents
@@ -198,7 +225,7 @@ Throughout the protocols, $k$ and $u$ represent the SRP parameters, i.e.,
 We use $\{P_i\}_{i \in \mathcal{T}}$ as a proof which will be
 checked at each server in some protocols.
 
-\subsubsection*{TPA for Enrollment}
+\subsubsection*{$\mathcal{TPA}$ for Enrollment}
 Every node in the system has a unique ID and a public / private key
 pair associated with the ID. Some nodes can share the same ID but are
 not likely to share the keys. Each node generates the ID and keys
@@ -233,7 +260,7 @@ See \ref{register} for the actual protocols.
 \fi
 
 
-\subsubsection*{TPA for Data Secrecy}
+\subsubsection*{$\mathcal{TPA}$ for Data Secrecy}
 The system provides a roaming encryption service. A user encrypts
 the value at a node then sends the encrypted value to a quorum. He can
 decrypts the value at any node with the password. The password is
@@ -248,14 +275,14 @@ process first to get the proof. With the proof the client proceeds the
 {\em read} process and decrypts the value with the above key.
 
 \subsection{Distributed Signing}
-Most crypto-currency systems use simple digital signature schemes to
-sign transactions. If private keys are stolen all assets can be
-transferred to someone's address without an authorization of the
-original users. One of the means to mitigate such situation is to use
-{\em multi-sig}. With the multi-sig scheme multiple parties need to be
-involved in the signning process. Most systems adopt multi-sig as an
-add-on security measure to the blockchain technologies. BFTKV
-nativelly supports distributed signing schemes based on threshold
+Some crypto-currency systems still use simple digital signature
+schemes to sign transactions. If private keys are stolen all assets
+can be transferred to someone's address without an authorization of
+the original users. One of the means to mitigate such situation is to
+use {\em multi-sig}. With the multi-sig scheme multiple parties need
+to be involved in the signning process. Most systems adopt multi-sig
+as an add-on security measure to the blockchain technologies. BFTKV
+natively supports distributed signing schemes based on threshold
 cryptography, which is compatible with the standard algorithms
 therefore the verifiers do not need to change any way to process the
 transactions.

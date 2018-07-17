@@ -2,6 +2,7 @@
 %
 % algorithms
 %
+\label{GetQC}
 \begin{algorithm}
   \caption{GetQC}
   \SetAlgoNoLine
@@ -36,11 +37,12 @@
   return $C$
 \end{algorithm}
 
+\label{CheckSigs}
 \begin{algorithm}
-  \caption{Verification of Signature Sets}
+  \caption{CheckSigs}
   \SetAlgoNoLine
   \KwIn{$S = \{S_i\}, S_i = Sign_{Q_i}(\langle x, t, v, s_C \rangle)$}
-  $Cliques = FindMaximalCliques(self)$\;
+  $Cliques = GetQC()$\;
   \For{$clique \in Cliques$}
   {
     \If{not $VerifySS(clique, S)$}
@@ -51,8 +53,9 @@
   return $True$\;
 \end{algorithm}
 
+\label{CheckQuorumCert}
 \begin{algorithm}
-  \caption{Verification of Quorum Certifiate}
+  \caption{CheckQuorumCert}
   \SetAlgoNoLine
   \KwIn{Cert}
   $Clique = FindMaximalClique(self)$\;
@@ -73,6 +76,7 @@
   }
 \end{algorithm}
 
+\label{CheckEquivocation}
 \begin{algorithm}
   \caption{Equivocation Check}
   \SetAlgoNoLine
@@ -84,6 +88,7 @@
   }
 \end{algorithm}
 
+\label{CheckTOFU}
 \begin{algorithm}
   \caption{TOFU enforcement}
   \SetAlgoNoLine
@@ -106,6 +111,7 @@
 \ifdefined\ABSTRACT
 \else
 
+\label{Join}
 \begin{algorithm}
   \caption{Join}
   \SetAlgoNoLine
@@ -126,6 +132,7 @@
   }
 \end{algorithm}
 
+\label{Register}
 \begin{algorithm}
   \caption{Register}
   \SetAlgoNoLine
