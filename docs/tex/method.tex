@@ -191,8 +191,8 @@ To get a password authenticated
     B_i &= kv + g^{b_i} \bmod p, \\
     Z_i &= E_{K_i}(P_i, X ||B_i).
   \end{align*}
-\item The client collects $t$ responses from the quorum, then
-  calculates
+\item The client collects $t$ responses from the quorum. For each
+  response it calculates
   \[
     Y_i/g^a = g^{f(i)} \bmod p
   \]
@@ -206,16 +206,16 @@ To get a password authenticated
   \[
     \prod_{j \in \mathcal{T}}(g^{f(j)})^{\lambda_j} = g^S \bmod p.
   \]
-\item Calculate $K_i$ for each quorum member on the client side, such
-  that
+  Then calculate $K_i$ for each quorum member, such that
   \[
     K_i = (B_i - kg^x)^{a'+ux} \bmod p
   \]
-  then decrypts the proof
+  to decrypt the proof
   \[
-    (P_i, N) = D_{K_i}(Z_i)
+    (P_i, N) = D_{K_i}(Z_i).
   \]
-  and checks if $N = X||B_i$.
+  Check if $N = X||B_i$ to make sure both parties have shared the key
+  correctly. 
 \end{enumerate}
 Throughout the protocols, $k$ and $u$ represent the SRP parameters, i.e.,
 \begin{align*}

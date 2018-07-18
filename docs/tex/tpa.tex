@@ -1,0 +1,45 @@
+\section{Security Analysis for $\mathcal{TPA}$}
+We use the blinding technique to convey $y_i$ securely from servers to
+the client. The purpose of this part is to make $g^S$ so the client
+can calculate $x = \pi g^S$ for the SRP part. From SSS, it is
+semantically impossible to recalculate $g^S$ from less than $t$
+responses.
+
+\begin{lemma}
+\label{tpa1}
+From ${Y_i}_{i \in \mathcal{L}}$ where $L \subset \{1..n\}$ and $|L| <
+t$, $g^S \bmod p$ cannot be calculated.
+\end{lemma}
+
+\begin{proof}
+$S$ cannot be reconstructed from $|L|$ servers, from the SSS
+  property.
+\end{proof}
+
+\subsecion{Reducation to SRP}
+The protocol can be seen as SRP with the password $x = \pi g^S$ which
+masks the password with the shared secret. In fact, the $B_i$ part is
+the same as SRP except the random exponent $a$ for $X = g^a$ is $a' =
+a - g^{\pi'}$. Therefore if we agree that $a'$ is as random as $a$,
+the SRP part is secure. If $a$ is one time generated pseudo random
+number $F(\pi') = a - g^{pi'}$ is a secure PRF as the function $F$ can
+be seen as the onetime pad. Therefore it is semantically impossible to
+retrieve the password secret $\pi'$ from $a'$. Also $a'$ is as random
+as $a$ from the property of onetime pad.
+
+The protocol is one roundtrip therefore it gives only implicit
+authentication for clients. The server gives $Z_i = E_{K_i}(P_i,
+X||B_i)$ before confirming the authenticity of the client. It will 
+no longer have the zero knowledge property the original SRP has. The
+reason of this is even when one server is compromised it will be
+possible to do brute force attacks on $x$. Even if it is
+infeasible unlike the simple password authentiation, the security
+analysis is under the assumption where some servers (less than $t$)
+are compromised, therefore we decided to break the ZK property and to
+simplify the protocol.
+
+\subsection{(In)possibility of offline dictionary attacks}
+Assume we have $\mathcal{L}$ compromised servers and try to reconstruct $g^S
+\bmod p$ from ${y_i}$. From the Lemma ~\ref{tpa1} we need at least one
+$Y_j$, $j \notin \mathcal{L}$, and unless the server $j$ is not
+compromised the only way to get $Y_j$ is to issue the protocol
