@@ -159,8 +159,8 @@ where:
 \begin{align*}
   y_i &= f(i) \\
   v_i &= g_{\pi}^{Ss_i} \bmod p \\
-  s_i &= g_{\pi}^{h(ID_i)} \bmod q \\
-  g_{\pi} &= \pi^2 \bmod q \\
+  s_i &= g_{\pi}^{h(ID_i)} \bmod p \\
+  g_{\pi} &= \pi^2 \bmod p \\
   \pi &= \text{OS2I}(h(password))
 \end{align*}
 $p$ and $q$ are prime numbers such that $p = 2q + 1$ (i.e., $p$ is a
@@ -182,25 +182,30 @@ To get a password authenticated
     Y_i = X^{y_i} \bmod p.
   \]
 
-\item The client collects $t$ responses from the quorum, and
+\item The client collects $t$ responses from the quorum ($\mathcal{T}
+  \subseteq Q$), and
   calculates:
-  \begin{align*}
-    X' &= \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = (g_{\pi}^S)^a
-         \bmod p \\
-    s_i &= g_{\pi}^{h(ID_i)} \bmod q \\
-    X_i &= X'^{s_i} = g_{\pi}^{Sas_i} \bmod p
-  \end{align*}
+  \[
+    G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = (g_{\pi}^S)^a \bmod p
+  \]
   where each $\lambda_j$ is the lagrange interporate:
   \[
     \lambda_j = \prod_{l \in \mathcal{T} \setminus \{j\}}
-    i_l / (i_l - i_j) \bmod q
+    i_l / (i_l - i_j) \bmod q.
   \]
-  then sends $X_i$ back to each server $i$.
+  Then, for each server $i \in \mathcal{T}$, calculate and send back:
+  \[
+    X_i = G_S^{s_i} \bmod p
+  \]
+  where
+  \[
+    s_i = g_{\pi}^{h(ID_i)} \bmod p.
+  \]
 
-\item Quorum members generate a random exponent
+\item Each quorum member($\in \mathcal{T}$) generates a random exponent
   $b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q$
   for a DH session key:
-  \[ K_i = X'^{b_i} \bmod p \]
+  \[ K_i = X_i^{b_i} \bmod p \]
   and encrypts the proof:
   \[
     Z_i = E_{K_i}(P_i, X || Y_i)
@@ -218,8 +223,8 @@ To get a password authenticated
   \[
     (P_i, N) = D_{K_i}(Z_i).
   \]
-  Check if $N = X||Y_i$ to make sure both parties have shared the key
-  correctly. 
+  Check if $N = X||Y_i$ to make sure both parties have shared the
+  session key correctly. 
 \end{enumerate}
 We use $\{P_i\}_{i \in \mathcal{T}}$ as a proof which will be
 checked at each server in some protocols.
@@ -264,8 +269,8 @@ The system provides a roaming encryption service. A user encrypts
 the value at a node then sends the encrypted value to a quorum. He can
 decrypts the value at any node with the password. The password is
 stored with $\langle x, t, v \rangle$ in the way of the {\em threshold
-password authenticaiton}. The encryption key is $H(\pi g^S)$. $S$,
-therefore the random polynomial, has to be randomly generated
+password authenticaiton}. The encryption key is $H(g_{\pi}^S)$. $S$
+(and the random polynomial as well) has to be randomly generated
 everytime the data is encrypted at a client.
 
 To decrypt the data the user specifies the variable $x$ along with the

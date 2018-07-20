@@ -3,16 +3,36 @@
 \else
 \section{Conclusions and Future Work}
 \fi
-We developed an efficient and secure key-value store. The graph driven
-architecture gives flexibility to the system, which makes it possible
-to join / leave freely without any additional authorization
-mechanism. Unlike other key-value stores, BFTKV provides strong
-encryption and signature schemes with a threshold cryptosystem as
-well. It also solves nasty problems like recovering from a key-loss
-situation and supporting multiple devices under the same user ID.
+We developed an efficient and secure distributed key-value store which
+can be an answer for a long standing problem: How to authenticate
+public keys without relying on central authorities. With BFTKV,
+users no longer need to confirm peers' fingerprints or to scan a QR
+code in person to ``authenticate'' the public key, which is the ways
+most secure chat apps do at the moment. For example, see ``Security
+considerations'' from Signal protocols which is one of the most
+acclaimed peer-to-peer secure protocols \cite{signal}.
+The graph driven architecture gives flexibility to the system, which
+makes it possible to join / leave freely without any additional
+authorization mechanism. This property makes the system transparent to
+anyone, which is especially important for end-to-end systems where we
+do not trust any entity even if it is the one who is running the
+application systems.
+
+Unlike most other key-value stores, BFTKV provides strong encryption
+and signature schemes with a threshold cryptosystem as well. With
+these features and the robust and open key-value storage, the system
+will be an ideal platform to build blockchain technologies.
+
+Also with the unique threshold password authentication system, it
+solves problems like recovering from a key-loss situation and
+supporting multiple devices under the same user ID. Most permissioned
+systems will suffer these nasty problems when they actually deploy a
+system. BFTKV integrates all those features into a Byzantine
+fault-tolerant distributed key-value store.
 
 \ifdefined\ABSTRACT
 \else
+\subsecion*{Future Work}
 Scalability of bitcoin blockchain is excellent -- you can add as many
 nodes as you want and it will not affect the whole system, but the
 latency and throughput of the whole process is terrible -- it takes
