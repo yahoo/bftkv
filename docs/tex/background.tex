@@ -46,13 +46,14 @@ end-users' certificates but quorum members' as well.
 Threshold cryptosystems play important roles in this system. We use it
 not just for fault-tolerance but for improving security.
 
-Shamir's Shared Secret (SSS) is a major tool to construct threshold
-cryptographic schemes. The system uses SSS for both password
-authentication and DSA / ECDSA signature schemes. Especially for the
-latter, the system uses a threshold siganture scheme introduced by
-Gennaro et al.\ \cite{Gennaro}. For the threshold password
-authentication, the system adopts SRP \cite{srp} with SSS. See
-~\ref{threshold} for the details.
+Shamir's Shared Secret (SSS) \cite{shamir} is a major tool to
+construct threshold cryptographic schemes. The system uses SSS for
+both password authentication and DSA / ECDSA signature
+schemes. Especially for the latter, the system uses a threshold
+siganture scheme introduced by Gennaro et al.\ \cite{Gennaro}. For the
+threshold password authentication, the system uses a simple DH key
+exchange protocol with a similar setting to \cite{ford}.
+See ~\ref{threshold} for the details.
 SSS uses a $t-1$ degree random polynomial on $\mathbb{Z}_q$
 \[
   f(x) = \sum_{i=0}^{t-1}a_ix^i \bmod q

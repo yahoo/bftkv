@@ -1,13 +1,19 @@
 \section{Security Analysis for $\mathcal{TPA}$}
-We use the blinding technique to convey $y_i$ securely from servers to
-the client. The purpose of this part is to make $g^S$ so the client
-can calculate $x = \pi g^S$ for the SRP part. From SSS, it is
-semantically impossible to recalculate $g^S$ from less than $t$
+The protocol consists of two parts:
+\begin{enumerate}
+\item To reconstruct $g^S \bmod p$ with $X$ and $Y_i$ ($Y_i$ part)
+\item Do SRP with $x$ and $B_i$ ($B_i$ part)
+\end{enumerate}
+
+For $Y_i$ part, we use the blinding technique to convey $y_i$ securely
+from servers to the client. The purpose of this part is to make $g^S$
+so the client can calculate $x = \pi g^S$ for the SRP part. From SSS,
+it is semantically impossible to recalculate $g^S$ from less than $t$
 responses.
 
 \begin{lemma}
 \label{tpa1}
-From ${Y_i}_{i \in \mathcal{L}}$ where $L \subset \{1..n\}$ and $|L| <
+From $\{Y_i\}_{i \in \mathcal{L}}$ where $L \subset \{1..n\}$ and $|L| <
 t$, $g^S \bmod p$ cannot be calculated.
 \end{lemma}
 
@@ -16,7 +22,7 @@ $S$ cannot be reconstructed from $|L|$ servers, from the SSS
   property.
 \end{proof}
 
-\subsecion{Reducation to SRP}
+\subsection{Reducation to SRP}
 The protocol can be seen as SRP with the password $x = \pi g^S$ which
 masks the password with the shared secret. In fact, the $B_i$ part is
 the same as SRP except the random exponent $a$ for $X = g^a$ is $a' =
@@ -42,4 +48,7 @@ simplify the protocol.
 Assume we have $\mathcal{L}$ compromised servers and try to reconstruct $g^S
 \bmod p$ from ${y_i}$. From the Lemma ~\ref{tpa1} we need at least one
 $Y_j$, $j \notin \mathcal{L}$, and unless the server $j$ is not
-compromised the only way to get $Y_j$ is to issue the protocol
+compromised the only way to get $Y_j$ is to issue the protocol $X =
+g^{a'} \bmod q$ and let the server cancel out the $g^{\pi'}$ by
+$Xg^{y_i} \bmod p$ with the correct password ($pi'$). To guess the
+password 

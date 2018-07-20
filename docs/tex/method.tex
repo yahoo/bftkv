@@ -144,9 +144,9 @@ authentication for:
 
 The system employes a threshold password authentication scheme which
 is immune from offline dictionary attacks (as long as the number of
-compromised servers is less than the threshold). We use Shamir's
-Secret Sharing (SSS) to split the password secret and SRP \cite{srp}
-for the authentication protocol.\\
+compromised servers is less than the threshold). The authentication
+protocol is similar to \cite{ford} by Ford and Kaliski, but the shared
+secret is calculated by Shamir's Secret Sharing (SSS) \cite{shamir}.\\
 
 To set up the {\em shares} the client generates a random polynomial
 for $(t, n)$ SSS on a prime field $\mathbb{Z}_q$, s.t.,
@@ -154,74 +154,73 @@ for $(t, n)$ SSS on a prime field $\mathbb{Z}_q$, s.t.,
   f(x) = \sum_{i=0}^{t-1}a_ix^i \bmod q
 \]
 then calculates $n=|Q|$ pairs $(i,f(i)), i = 1..n$. The shared secret
-is $S = f(0)$. The client also generates a random $salt$. Each {\em
-share} will be $\langle i, y_i, v, salt \rangle$, where
+is $S = f(0)$. Each {\em share} will be $\langle i, y_i, v_i \rangle$,
+where:
 \begin{align*}
-  y_i &= f(i) + g^{\pi'} \bmod q \\
-  v &= g^x \bmod p \\
-  x &= \pi g^S \bmod q \\
-  \pi &= \text{OS2I}(h(salt, password)) \bmod p \\
-  \pi' &= \text{OS2I}(h(password)) \bmod q
+  y_i &= f(i) \\
+  v_i &= g_{\pi}^{Ss_i} \bmod p \\
+  s_i &= g_{\pi}^{h(ID_i)} \bmod q \\
+  g_{\pi} &= \pi^2 \bmod q \\
+  \pi &= \text{OS2I}(h(password))
 \end{align*}
 $p$ and $q$ are prime numbers such that $p = 2q + 1$ (i.e., $p$ is a
-safe prime), $g$ is a generator on $\mathbb{Z}_q$. The random
-polynomial and salt must be generated randomly for each password.\\
+safe prime). The random polynomial must be generated randomly for each
+password.\\
 
 To get a password authenticated
 \begin{enumerate}
 \item The client generates a random number
   $a \xleftarrow{\mathcal{R}} \mathbb{Z}_q$
-  and sends
+  and calculates $X$ from the password:
   \[
-    X = g^{a'} \bmod p
+    X = g_{\pi}^a \bmod p
   \]
-  where
+  then broadcast it to a quorum $Q$.
+
+\item Each quorum member returns:
   \[
-    a' = a - g^{\pi'} \bmod q
+    Y_i = X^{y_i} \bmod p.
   \]
-  to a quorum $Q$.
-\item Each quorum member generates a random number
-  $b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q$
-  and calculates a session key
-  \[ K_i = (Xv^u)^{b_i} \bmod p \]
-  then sends back $\{Y_i, B_i, salt, Z_i\}$,
-  where
+
+\item The client collects $t$ responses from the quorum, and
+  calculates:
   \begin{align*}
-    Y_i &= X g^{y_i} \bmod p, \\
-    B_i &= kv + g^{b_i} \bmod p, \\
-    Z_i &= E_{K_i}(P_i, X ||B_i).
+    X' &= \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = (g_{\pi}^S)^a
+         \bmod p \\
+    s_i &= g_{\pi}^{h(ID_i)} \bmod q \\
+    X_i &= X'^{s_i} = g_{\pi}^{Sas_i} \bmod p
   \end{align*}
-\item The client collects $t$ responses from the quorum. For each
-  response it calculates
-  \[
-    Y_i/g^a = g^{f(i)} \bmod p
-  \]
-  and applies the lagrange interpolate
+  where each $\lambda_j$ is the lagrange interporate:
   \[
     \lambda_j = \prod_{l \in \mathcal{T} \setminus \{j\}}
     i_l / (i_l - i_j) \bmod q
   \]
-  to $g^{f(i)}$ 
-  to get
+  then sends $X_i$ back to each server $i$.
+
+\item Quorum members generate a random exponent
+  $b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q$
+  for a DH session key:
+  \[ K_i = X'^{b_i} \bmod p \]
+  and encrypts the proof:
   \[
-    \prod_{j \in \mathcal{T}}(g^{f(j)})^{\lambda_j} = g^S \bmod p.
+    Z_i = E_{K_i}(P_i, X || Y_i)
   \]
-  Then calculate $K_i$ for each quorum member, such that
+  then sends it back to the client with
   \[
-    K_i = (B_i - kg^x)^{a'+ux} \bmod p
+    B_i = v_i^{b_i} \bmod p.
   \]
-  to decrypt the proof
+
+\item The client decrypts $Z_i$ with
+  \[
+    K_i = B_i^{a} \bmod p
+  \]
+  and get:
   \[
     (P_i, N) = D_{K_i}(Z_i).
   \]
-  Check if $N = X||B_i$ to make sure both parties have shared the key
+  Check if $N = X||Y_i$ to make sure both parties have shared the key
   correctly. 
 \end{enumerate}
-Throughout the protocols, $k$ and $u$ represent the SRP parameters, i.e.,
-\begin{align*}
-  k &= H(p, g) \\
-  u &= H(X, B_i)
-\end{align*}
 We use $\{P_i\}_{i \in \mathcal{T}}$ as a proof which will be
 checked at each server in some protocols.
 
