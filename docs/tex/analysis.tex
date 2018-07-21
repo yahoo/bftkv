@@ -9,9 +9,6 @@ $S'$. Honest servers will refuse the request because it does not
 satisfy the basic $b$-masking quorum condition: $|S| \geq b+1$. But
 with $b+1$ colluding nodes, the attack will succeed.
 
-\ifdefined\ABSTRACT
-\else
-
 \newcommand{\slice}[4]{
   \pgfmathparse{0.5*#1+0.5*#2}
   \let\midangle\pgfmathresult
@@ -34,8 +31,8 @@ with $b+1$ colluding nodes, the attack will succeed.
 
 \newcounter{a}
 \newcounter{b}
-\foreach \p/\t/\l in {25//,40/$H_1$/Honest nodes, 20/$F$/Faulty nodes,
-40/$H_2$/Honest nodes}
+\foreach \p/\t/\l in {25//,40/$\mathcal{H}_1$/Honest nodes,
+20/$\mathcal{F}$/Faulty nodes, 40/$\mathcal{H}_2$/Honest nodes}
   {
     \setcounter{a}{\value{b}}
     \addtocounter{b}{\p}
@@ -46,7 +43,6 @@ with $b+1$ colluding nodes, the attack will succeed.
 
 \end{tikzpicture}
 
-\fi
 
 The maximum number of signatures dishonest clients can get is
 $b+(n-b)/2$. Therefore, to overcome the attack we need
@@ -56,13 +52,14 @@ $b+(n-b)/2$. Therefore, to overcome the attack we need
 Even if the number of faulty nodes exceeds the above threshold, the
 system can detect malicious actions with the following probability
 \begin{align*}
-  F_p &= Pr[Q \cap H_1 \neq \emptyset \wedge Q \cap H_2 \neq
-        \emptyset] \\
-      & = 1 - Pr[Q \subseteq F \cup H_1] \\
+  F_p &= Pr[Q \cap \mathcal{H}_1 \neq \emptyset \wedge Q \cap
+        \mathcal{H}_2 \neq \emptyset] \\
+      & = 1 - Pr[Q \subseteq \mathcal{F} \cup \mathcal{H}_1] \\
       & = 1 - ((n + f) / 2n)^{|Q|}
 \end{align*}
-when $f > b$ and $|Q| < (f + n)/2$, where $f$ is the number of the
-faulty nodes, assuming the sizes of $H_1$ and $H_2$ are the same.
+when $f > b$ and $|Q| < (f + n)/2$, where $f = |\mathcal{F}|$ is the
+number of the faulty nodes, assuming the sizes of $\mathcal{H}_1$ and
+$\mathcal{H}_2$ are the same.
 
 In the case of $f \le b$ the detection rate is always 100\% because it is
 guaranteed that clients can always find a valid value and anything
@@ -71,8 +68,8 @@ faulty nodes exceeds the threshold, i.e., $f > b$, it will be possible that
 the client cannot detect all malicious actions. Since the minimum
 quorum size is $(n-1)/3$ it does not need to consider the case where
 $|Q| < n/3$. Also, if the size exceeds $(f+n)/2$ any quorum always
-includes at least one node from each $H_i$ which makes the detection
-rate 100\%.
+includes at least one node from each $\mathcal{H}_i$ which makes the
+detection rate 100\%.
 
 \ifdefined\ABSTRACT
 \else

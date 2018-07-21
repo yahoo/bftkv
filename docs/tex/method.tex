@@ -186,7 +186,7 @@ To get a password authenticated
   \subseteq Q$), and
   calculates:
   \[
-    G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = (g_{\pi}^S)^a \bmod p
+    G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} \bmod p
   \]
   where each $\lambda_j$ is the lagrange interporate:
   \[
@@ -228,6 +228,25 @@ To get a password authenticated
 \end{enumerate}
 We use $\{P_i\}_{i \in \mathcal{T}}$ as a proof which will be
 checked at each server in some protocols.
+
+\ifdefined\ABSTRACT
+Here is a brief explanation of correctness
+\footnote{See the full paper for a security analysis.}.
+Assume $\{Y_i\}_{\{i \in \mathcal{T}\}}$ is correctly calculated,
+$G_S$ will be:
+\[
+  G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = g_{\pi}^{a \sum_{j
+      \in \mathcal{T}} f(j) \lambda_j} = (g_{\pi}^S)^a \bmod p
+\]
+and by raising $s_i = g_{\pi}^{h(ID_i)} \bmod p$ to $G_S$, we get:
+\[
+  X_i = G_S^{s_i} = (g_{\pi}^{Ssi})^a \bmod p
+\]
+which must be the same as $v_i^a \bmod p$ for each $i \in
+\mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
+step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
+share Diffie-Hellman session keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
+\fi
 
 \subsubsection*{$\mathcal{TPA}$ for Enrollment}
 Every node in the system has a unique ID and a public / private key
