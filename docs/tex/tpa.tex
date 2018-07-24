@@ -1,20 +1,25 @@
 \section{Security Analysis for $\mathcal{TPA}$}
-The protocol consists of two parts:
-\begin{enumerate}
-\item To reconstruct $g^S \bmod p$ with $X$ and $Y_i$ ($Y_i$ part)
-\item Do SRP with $x$ and $B_i$ ($B_i$ part)
-\end{enumerate}
-
-For $Y_i$ part, we use the blinding technique to convey $y_i$ securely
-from servers to the client. The purpose of this part is to make $g^S$
-so the client can calculate $x = \pi g^S$ for the SRP part. From SSS,
-it is semantically impossible to recalculate $g^S$ from less than $t$
-responses.
+\label{tpa}
+\subsubsection*{Correctness}
+Assume $\{Y_i\}_{\{i \in \mathcal{T}\}}$ is correctly calculated,
+$G_S$ will be:
+\[
+  G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = g_{\pi}^{a \sum_{j
+      \in \mathcal{T}} f(j) \lambda_j} = (g_{\pi}^S)^a \bmod p
+\]
+and by raising $s_i = g_{\pi}^{h(ID_i)} \bmod p$ to $G_S$, we get:
+\[
+  X_i = G_S^{s_i} = (g_{\pi}^{Ssi})^a \bmod p
+\]
+which must be the same as $v_i^a \bmod p$ for each $i \in
+\mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
+step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
+share Diffie-Hellman session keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
 
 \begin{lemma}
 \label{tpa1}
 From $\{Y_i\}_{i \in \mathcal{L}}$ where $L \subset \{1..n\}$ and $|L| <
-t$, $g^S \bmod p$ cannot be calculated.
+t$, correct $G_S$ cannot be obtained.
 \end{lemma}
 
 \begin{proof}
@@ -22,7 +27,8 @@ $S$ cannot be reconstructed from $|L|$ servers, from the SSS
   property.
 \end{proof}
 
-\subsection{Reducation to SRP}
+\subsection{Reducation to DH}
+
 The protocol can be seen as SRP with the password $x = \pi g^S$ which
 masks the password with the shared secret. In fact, the $B_i$ part is
 the same as SRP except the random exponent $a$ for $X = g^a$ is $a' =

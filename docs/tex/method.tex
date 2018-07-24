@@ -107,10 +107,10 @@ run. Even if the quorum system excludes uncertified keys by majority
 vote, excluding compromised nodes will increase the fault tolerance
 rate drastically.
 Each node severs the trust link independently without consulting
-others when it detects a node signs both $\langle x,t,v \rangle$ and
-$\langle x,t,v' \rangle$ s.t.  $v \neq v'$. Also servers revoke
-clients when it detects a client signing different values with the
-same timestamp as well. Once a node is revoked, the node will be
+others when it detects a node that has signed both $\langle x,t,v
+\rangle$ and $\langle x,t,v' \rangle$ s.t.  $v \neq v'$. Also servers
+revoke clients when it detects a client signing different values with
+the same timestamp as well. Once a node is revoked, the node will be
 excluded from the graph and there is no way to restore it.
 
 Every node in the KV quorum checks if there is a node ($\in QC$) has
@@ -246,6 +246,8 @@ which must be the same as $v_i^a \bmod p$ for each $i \in
 \mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
 step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
 share Diffie-Hellman session keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
+\else
+See Appendix \ref{tpa} for correctness and security analysis.
 \fi
 
 \subsubsection*{$\mathcal{TPA}$ for Enrollment}
