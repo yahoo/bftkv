@@ -97,9 +97,10 @@ where
   f(0) &= \sum_{i \in \mathcal{T}} f(i) \lambda_i \\
   g(0) &= \sum_{i \in \mathcal{T}} g(i) \lambda_i
 \end{align*}
-$T'$ is a subset of $\{1..n\}$ and $|\mathcal{T'}| = 2t$. These
-properties make it possible to calculate the DSA / ECDSA signature
-$(r, s)$, such that:
+$\mathcal{T'}$ is a subset of $\{1..n\}$ and $|\mathcal{T'}| =
+2t$. These properties make it possible to calculate the DSA / ECDSA
+signature $(r, s)$ which invovles additions and multiplications of
+shared variables, such that:
 \begin{align*}
   r &= g^k \bmod p \bmod q\\
   s &= k^{-1}(x + mr) \bmod q

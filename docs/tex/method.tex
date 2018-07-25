@@ -208,7 +208,7 @@ To get a password authenticated
   \[ K_i = X_i^{b_i} \bmod p \]
   and encrypts the proof:
   \[
-    Z_i = E_{K_i}(P_i, X || Y_i)
+    Z_i = E_{h(K_i)}(P_i, X || Y_i)
   \]
   then sends it back to the client with
   \[
@@ -221,7 +221,7 @@ To get a password authenticated
   \]
   and get:
   \[
-    (P_i, N) = D_{K_i}(Z_i).
+    (P_i, N) = D_{h(K_i)}(Z_i).
   \]
   Check if $N = X||Y_i$ to make sure both parties have shared the
   session key correctly. 
@@ -247,7 +247,8 @@ which must be the same as $v_i^a \bmod p$ for each $i \in
 step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
 share Diffie-Hellman session keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
 \else
-See Appendix \ref{tpa} for correctness and security analysis.
+See Appendix \ref{tpa} for correctness and security analysis of
+$\mathcal{TPA}$.
 \fi
 
 \subsubsection*{$\mathcal{TPA}$ for Enrollment}
@@ -284,15 +285,14 @@ update the values associated with the ID.\\
 See \ref{register} for the actual protocols.
 \fi
 
-
 \subsubsection*{$\mathcal{TPA}$ for Data Secrecy}
-The system provides a roaming encryption service. A user encrypts
-the value at a node then sends the encrypted value to a quorum. He can
-decrypts the value at any node with the password. The password is
-stored with $\langle x, t, v \rangle$ in the way of the {\em threshold
-password authenticaiton}. The encryption key is $H(g_{\pi}^S)$. $S$
-(and the random polynomial as well) has to be randomly generated
-everytime the data is encrypted at a client.
+The system provides a roaming service to store and access encrypted
+data. Users encrypt the value at a node then send the encrypted value
+to a quorum. They can decrypt the value at any node with the
+password. The password is stored with $\langle x, t, v \rangle$ in the
+way of the {\em threshold password authenticaiton}. The encryption key
+is $H(g_{\pi}^S)$. $S$ (and the random polynomial as well) has to be
+randomly generated everytime the data is encrypted at a client.
 
 To decrypt the data the user specifies the variable $x$ along with the
 password then the client starts the threshold password authentication

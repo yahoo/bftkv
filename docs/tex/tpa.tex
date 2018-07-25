@@ -1,6 +1,6 @@
 \section{Security Analysis for $\mathcal{TPA}$}
 \label{tpa}
-\subsubsection*{Correctness}
+\subsection{Correctness}
 Assume $\{Y_i\}_{\{i \in \mathcal{T}\}}$ is correctly calculated,
 $G_S$ will be:
 \[
@@ -14,7 +14,7 @@ and by raising $s_i = g_{\pi}^{h(ID_i)} \bmod p$ to $G_S$, we get:
 which must be the same as $v_i^a \bmod p$ for each $i \in
 \mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
 step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
-share Diffie-Hellman session keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
+share DH keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
 
 \begin{lemma}
 \label{tpa1}
@@ -24,37 +24,34 @@ t$, correct $G_S$ cannot be obtained.
 
 \begin{proof}
 $S$ cannot be reconstructed from $|L|$ servers, from the SSS
-  property.
+  property, thus $g_{\pi}^S$ cannot be constructed.
 \end{proof}
 
-\subsection{Reducation to DH}
-
-The protocol can be seen as SRP with the password $x = \pi g^S$ which
-masks the password with the shared secret. In fact, the $B_i$ part is
-the same as SRP except the random exponent $a$ for $X = g^a$ is $a' =
-a - g^{\pi'}$. Therefore if we agree that $a'$ is as random as $a$,
-the SRP part is secure. If $a$ is one time generated pseudo random
-number $F(\pi') = a - g^{pi'}$ is a secure PRF as the function $F$ can
-be seen as the onetime pad. Therefore it is semantically impossible to
-retrieve the password secret $\pi'$ from $a'$. Also $a'$ is as random
-as $a$ from the property of onetime pad.
-
-The protocol is one roundtrip therefore it gives only implicit
-authentication for clients. The server gives $Z_i = E_{K_i}(P_i,
-X||B_i)$ before confirming the authenticity of the client. It will 
-no longer have the zero knowledge property the original SRP has. The
-reason of this is even when one server is compromised it will be
-possible to do brute force attacks on $x$. Even if it is
-infeasible unlike the simple password authentiation, the security
-analysis is under the assumption where some servers (less than $t$)
-are compromised, therefore we decided to break the ZK property and to
-simplify the protocol.
+\subsection{Key Exchange}
+Under the DDH assumption \cite{boneh}, $K_i = g_{\pi}^{Ss_iab_i} \bmod
+p$ can be considered as $n$-party DH, i.e., given
+$g^{x_1x_2...x_{n-1}} \bmod p$ and $g^{x_n} \bmod p$ it is hard to
+compute $g^{x_1x_2...x_n} \bmod p$ without knowing a $x_n$.
+From the correctness lemma, the client correctly obtains
+$g_{\pi}^S$ from $t$ servers. Also since it knows the password it can
+calculate $g_{\pi}^{h(ID)}$. With the random DH exponent $a$ it can
+calculate $g_{\pi}^Ss_ia \bmod p$. At each server $g_{\pi}^{Ss_i}
+\bmod p$ is pre-calculated. To obtain $b_i$ from $B_i =
+g_{\pi}^{Ss_ib_i} \bmod p$ the client needs to calculate discrete log
+on $B_i$. Unless the client can obtain $b_i$ it cannot calculate $K_i$
+from a made up DH term. Thus the client has no choice but to calculate
+$B_i^a \bmod p$ to obtain $K_i$.
 
 \subsection{(In)possibility of offline dictionary attacks}
-Assume we have $\mathcal{L}$ compromised servers and try to reconstruct $g^S
-\bmod p$ from ${y_i}$. From the Lemma ~\ref{tpa1} we need at least one
-$Y_j$, $j \notin \mathcal{L}$, and unless the server $j$ is not
-compromised the only way to get $Y_j$ is to issue the protocol $X =
-g^{a'} \bmod q$ and let the server cancel out the $g^{\pi'}$ by
-$Xg^{y_i} \bmod p$ with the correct password ($pi'$). To guess the
-password 
+Assume we have $\mathcal{L} < t$ compromised servers and try to
+reconstruct $g_{\pi}^S \bmod p$ from ${y_i}$. From the Lemma
+~\ref{tpa1} we need at least one $Y_i$, $i \notin \mathcal{L}$, and
+unless the server $i$ is not compromised the only way to get $Y_i$ is
+to issue the protocol $X = g_{\pi}^a \bmod p$. Unless the attacker
+knows $\pi$ all he can do is to guess the password and to keep ask the
+server to calculate $Y_i = g_{\pi'}^a \bmod p$ for $\pi'$. If the
+guess is wrong $Y'_i$ will not calculate $g_{\pi}^S$ with the
+compromised data $\{f(j)\}_{j \in \mathcal{L}}$.
+Unless the attacker can calculate $S$ from $g^S \bmod p$ with a
+fabricated $g$, he cannot calculate $g_{\pi'}^S \bmod p$ in
+order to brute force for $g_{\pi'} \notin \{g^e | e = 1..p-1\}$.
