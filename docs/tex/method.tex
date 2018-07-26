@@ -1,20 +1,20 @@
 \section{Methodology}
 This section describes quorum systems based on the WoT graph, which
 are the main building blocks for our BFT protocols. Protocols are
-always between a client and a quorum. To write a key-value pair, the
-client issues a request to sign the messages to {\em Quorum Cliques},
-then with the set of signatures it issues another request to {\em KV
-  quorum} to actually store the key-value:
+always between a client and a quorum. Every message must be signed by
+a set of special nodes called {\em Quorum Cliques}, and stored in
+another quorum called {\em KV quorum}. To write a key-value pair we
+perform the three step process:
 \ifdefined\ABSTRACT
 \footnote{Detailed protocols are described in the full paper.}
 \fi
 \begin{enumerate}
-\item Collect signatures over a message from {\em Quorum Cliques}
-\item Send the message with the collective signature to {\em
-    KV quorum}
+\item Collect timestamps from a quorum and choose the latest one,
+\item Request to sign the message to a quorum in the {\em Quorum Cliques},
+\item Write the signed message to a {\em KV quorum}.
 \end{enumerate}
-To read a key-value pair, the client issues a {\em read}
-request to a {\em KV quorum}:
+To read a key-value pair, the client collects key-value pairs from 
+a {\em KV quorum}:
 \begin{enumerate}
 \item Collect key-value pairs from a {\em KV quorum}
 \item Choose the latest one
@@ -24,21 +24,24 @@ request to a {\em KV quorum}:
 See the section \ref{Protocols} below for details.
 \fi
 
-In order to complete the system, threshold cryptography based
-authentication and signature schemes are introduced as well.
+In order to complete the system, authentication and signature schemes
+based on a threshold cryptosystem are introduced in this section as
+well.
 
 \subsection{Quorum Cliques}
-We follow the faulty clients (dishonest writers) scenario described in
-``Byzantine Quorum Systems'' \cite{Delhi:1,Delhi:2}, which uses signed
-messages with $b$-masking quorum systems. In our system, such quorum
-system is constructed from maximal cliques in the WoT graph.
+We follow the faulty clients (or dishonest writers) scenario described
+in ``Byzantine Quorum Systems'' \cite{Delhi:1,Delhi:2}, which uses
+signed messages with $b$-masking quorum systems to avoid equivocation.
+\footnote{Aka double-spending in the blockchain world.}
+In our system, such quorum system is constructed from maximal cliques
+in the WoT graph.
 
-If the graph $G$ keeps some cliques and the starting node $s$ has
+If the graph $G$ contains some cliques and the starting node $s$ has
 outdegree edges to the cliques within the $L$ distrance, i.e.,
 \[
 \exists (s, u) \in G.E, s.t., u \in QC \text{ and } dist(s, u) \le L \\
 \]
-where $QC$ is quorum cliques obtained by the algorithm {\em GetQC}
+where $QC$ is quorum cliques obtained by the algorithm {\sf GetQC}
 \ref{GetQC},
 it will construct a quorum to sign messages. Note that the quorum
 depends on only the graph $G$. There are no other configuration data
@@ -60,42 +63,42 @@ to the WoT graph, i.e., $G.E = G.E \cup \{(n_2, n_1)\}$.
 
 The quorum certificate not only constructs the graph but also gives
 permissions to clients to mutate the value.
-Every {\em write} request includes the client's quorum certificate
+Every {\sf write} request includes the client's quorum certificate
 along with the self signed signature over $\langle x, t, v
 \rangle$. Each member of $QC$ verifies the signature and the quorum
 certificate before it sends back the signed message. See algorithms
-{\em CheckSigs} \ref{CheckSigs} and {\em
-  CheckQuorumCert} \ref{CheckQuorumCert}.
-
+{\sf VerifyCollectiveSignatures} \ref{VerifyCollectiveSignatures} and
+{\sf CheckQuorumCert} \ref{CheckQuorumCert}.
 
 \subsubsection*{Sybil Attack}
 When a node is compromised the node can try to make its own cliques
-with made-up colluding nodes. By the algorithm {\em GetQC}
-\ref{GetQC}, a node cannot be a member of more than one cliques, which
-means the compromised node has to sever links to honest nodes itself
-to make links with the colluding nodes, otherwise the clique can no
-longer be a member of a quorum.
-
-[ graph ]
+with made-up colluding nodes to outnumber the honest nodes. By the
+algorithm {\sf GetQC} \ref{GetQC} which is used to verify the quorum
+certificates and the collective signatures, a node cannot be a
+member of more than one cliques, which means the compromised node has
+to sever the trust links to other nodes itself to make links with the
+colluding nodes, otherwise the clique can no longer be a member of a
+quorum. If such a faulty clique disagrees with other cliques consensus
+will be no longer established.
 
 \subsection{Key-value Store}
-Quorum cliques are responsible for signing data collectively. Data is
-valid only when it has sufficient number of signatures from the
-cliques. 
-
-Once data is signed it can be sent to other nodes that trust the same
-quorum cliques. Such nodes can form another quorum system and we call
-it {\em KV quorum}. The only purpose of this quorum system is to make
-sure that clients can retrieve the latest key-value. {\em KV quorum}
-is typically chosen from $U\; \setminus\; QC$ for load balancing.
-
-The client collects $f + 1$ responses and chooses the latest data which
-has the biggest timestamp. If some servers return an old value or {\em
-  nil} the client will write back the latest value to those servers.
+Once data is signed by quorum cliques it can be sent to other nodes
+that are not necessarily members of the cliques. Such nodes can form
+another quorum system and we call it {\em KV quorum}. The main purpose
+of this quorum system is to make sure that clients can retrieve the
+latest key-value:
+\begin{enumerate}
+\item The client collects $f + 1$ responses and chooses one which
+  has the latest timestamp.
+\item If some servers return an old value or {\em
+    nil} the client will write back the latest value to those servers.
+\end{enumerate}
 \ifdefined\ABSTRACT
 \else
 See ~\ref{rw} for the actual protocols.
 \fi
+Also for load balancing, {\em KV quorum} is typically chosen from $U
+\setminus\; QC$.
 
 Each member of {\em KV quorum} must check equivocation and the
 permission of mutation (TOFU), when it receives the signed
@@ -103,29 +106,25 @@ transaction.
 
 \subsubsection*{Equivocation Check / Revocation}
 Revocation is the only way to keep the system sound in the long
-run. Even if the quorum system excludes uncertified keys by majority
-vote, excluding compromised nodes will increase the fault tolerance
-rate drastically.
+run. Keeping the number of faulty nodes within the quorum threshold is
+the key to the soundness of the system.
+
 Each node severs the trust link independently without consulting
 others when it detects a node that has signed both $\langle x,t,v
 \rangle$ and $\langle x,t,v' \rangle$ s.t.  $v \neq v'$. Also servers
 revoke clients when it detects a client signing different values with
-the same timestamp as well. Once a node is revoked, the node will be
-excluded from the graph and there is no way to restore it.
-
-Every node in the KV quorum checks if there is a node ($\in QC$) has
-signed both $\langle x, t, v, s_C \rangle$ and $\langle x, t, v', s'_C
-\rangle$ where $v \neq v'$.
-If the node finds such signature in $S$, it must immidiately revoke
-the signer.
-See algorithm {\em CheckEquivocation} \ref {CheckEquivocation}.
+the same timestamp as well. Once a node is revoked, it will be
+excluded from the WoT graph forever and there is no way to restore it.
+See algorithm {\sf CheckEquivocation} \ref {CheckEquivocation} for
+the equivocation check.
 
 \subsubsection*{TOFU Policy}
 The system enforces the TOFU policy on every write request. If the
-slot is empty nodes in the KV quorum will simply store the data. If
-the slot already has data, they first retrieve the latest data and
-check if the signer is the same as the one of the requested data.
-See algorithm {\em CheckTOFU} \ref{CheckTOFU}.
+slot is empty each node in the KV quorum will simply store the
+data. If the slot already has data, the node first retrieves the
+latest data and check if the signer is the same as the one of the
+requested data.  See {\sf CheckTOFU} \ref{CheckTOFU} for the
+algorithm to check the TOFU policy.
 
 \subsection{Threshold Password Authentication ($\mathcal{TPA}$)}
 \label{threshold}
@@ -133,20 +132,20 @@ The quorum system based on the WoT graph guarantees data
 integrity. The TOFU policy with the quorum certificate prevents
 unauthorized mutations. The collective signatures make it possible to
 check equivocation. All those functions rely on the digital signature
-scheme, which means each node in the system has to have its own key
-pair for signing and an associated ID. We use a password
-authentication for:
+scheme therefore managing the signing key is significantly
+important. We use a threshold password authentication ($\mathcal{TPA}$)
+for:
 \begin{itemize}
+\item enrolling nodes to the system
 \item recovering from a key-loss situation
 \item sharing an ID with multiple devices
 \item data secrecy (roaming encryption)
 \end{itemize}
-
-The system employes a threshold password authentication scheme which
-is immune from offline dictionary attacks (as long as the number of
-compromised servers is less than the threshold). The authentication
-protocol is similar to \cite{ford} by Ford and Kaliski, but the shared
-secret is calculated by Shamir's Secret Sharing (SSS) \cite{shamir}.\\
+$\mathcal{TPA}$ is immune from offline dictionary attacks (as long as
+the number of compromised servers is less than the threshold). The
+authentication protocol is similar to \cite{ford} by Ford and Kaliski,
+but the shared secret is calculated by Shamir's Secret Sharing (SSS)
+\cite{shamir}.\\
 
 To set up the {\em shares} the client generates a random polynomial
 for $(t, n)$ SSS on a prime field $\mathbb{Z}_q$, s.t.,
@@ -167,7 +166,7 @@ $p$ and $q$ are prime numbers such that $p = 2q + 1$ (i.e., $p$ is a
 safe prime). The random polynomial must be generated randomly for each
 password.\\
 
-To get a password authenticated
+To get a password authenticated:
 \begin{enumerate}
 \item The client generates a random number
   $a \xleftarrow{\mathcal{R}} \mathbb{Z}_q$
@@ -206,7 +205,7 @@ To get a password authenticated
   $b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q$
   for a DH session key:
   \[ K_i = X_i^{b_i} \bmod p \]
-  and encrypts the proof:
+  and encrypts the proof ($P_i = Sig_i(\centerdot)$):
   \[
     Z_i = E_{h(K_i)}(P_i, X || Y_i)
   \]
@@ -226,8 +225,11 @@ To get a password authenticated
   Check if $N = X||Y_i$ to make sure both parties have shared the
   session key correctly. 
 \end{enumerate}
-We use $\{P_i\}_{i \in \mathcal{T}}$ as a proof which will be
-checked at each server in some protocols.
+We use $\{P_i\}_{\{i \in \mathcal{T}\}}$ as the proof of
+authentication which will be attached to protocol messages and checked
+at each node during the {\sf read / write / register} protocols. The
+signed data in each $P_i = Sig_i(\centerdot)$ depends on those
+protocols.
 
 \ifdefined\ABSTRACT
 Here is a brief explanation of correctness
@@ -245,27 +247,19 @@ and by raising $s_i = g_{\pi}^{h(ID_i)} \bmod p$ to $G_S$, we get:
 which must be the same as $v_i^a \bmod p$ for each $i \in
 \mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
 step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
-share Diffie-Hellman session keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
+share DH keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
 \else
 See Appendix \ref{tpa} for correctness and security analysis of
 $\mathcal{TPA}$.
 \fi
 
 \subsubsection*{$\mathcal{TPA}$ for Enrollment}
-Every node in the system has a unique ID and a public / private key
-pair associated with the ID. Some nodes can share the same ID but are
-not likely to share the keys. Each node generates the ID and keys
-itself then registers it to the quorum cliques to get the public key
-signed by each member in the cliques. The process requires a password
-to register the certificate to the system. The password will be checked
-when the user wants to register multiple devices under the
-same ID. It also acts as a recovery key when a node has lost the
-key. As long as the user remembers the password he can generates a
-brand new key pair with the same ID and register it so that he can
-update the values associated with the ID.\\
+$\mathcal{TPA}$ is used to enroll new nodes to the system so it can
+recover from a key-loss situation and support multiple devices per
+user.\\
 
 \noindent
-{\em Enrollment:}
+Enrollment:
 \begin{enumerate}
 \item Generate a unique ID and a key pair.
 \item Send the certificate to a quorum with a password to get a
@@ -273,9 +267,9 @@ update the values associated with the ID.\\
 \end{enumerate}
 
 \noindent
-{\em Key recovery / secondary key generation:}
+Key recovery / secondary key generation:
 \begin{enumerate}
-\item Generate a new key pair with the ID.
+\item Generate a new key pair with the existing ID.
 \item Do the password authentication and get a proof.
 \item With the proof send the new certificate to a quorum to get a new
   quorum certificate.
@@ -289,21 +283,21 @@ See \ref{register} for the actual protocols.
 The system provides a roaming service to store and access encrypted
 data. Users encrypt the value at a node then send the encrypted value
 to a quorum. They can decrypt the value at any node with the
-password. The password is stored with $\langle x, t, v \rangle$ in the
-way of the {\em threshold password authenticaiton}. The encryption key
-is $H(g_{\pi}^S)$. $S$ (and the random polynomial as well) has to be
-randomly generated everytime the data is encrypted at a client.
+password. The password is stored along with $\langle x, t, v \rangle$.
+The encryption key is $h(g_{\pi}^S)$. $S$ (and the random polynomial
+as well) has to be randomly generated everytime the data is encrypted
+at a client.
 
 To decrypt the data the user specifies the variable $x$ along with the
 password then the client starts the threshold password authentication
 process first to get the proof. With the proof the client proceeds the
-{\em read} process and decrypts the value with the above key.
+{\sf read} process and decrypts the value with the above key.
 
 \subsection{Distributed Signing}
 Some crypto-currency systems still use simple digital signature
 schemes to sign transactions. If private keys are stolen all assets
 can be transferred to someone's address without an authorization of
-the original users. One of the means to mitigate such situation is to
+the original users. One of ways to mitigate such situation is to
 use {\em multi-sig}. With the multi-sig scheme multiple parties need
 to be involved in the signning process. Most systems adopt multi-sig
 as an add-on security measure to the blockchain technologies. BFTKV
@@ -320,7 +314,7 @@ distributed signing feature satisfies those mandate requirements.
 The system takes advantages of the distributed platform to make a
 signature without revealing the private key. Once the key is
 distributed among quorum members, the complete private key will never
-appear at any server or client. The system supports three threshold
+appear at any server or client. The system supports three
 signature algorithms: RSA (PKCS1.5), DSA and ECDSA. Our scheme takes
 existing keys as-is and distributes it to multiple servers, which
 makes it easy to migrate.
@@ -363,12 +357,12 @@ practical.
 \subsubsection*{DSA, ECDSA}
 BFTKV implements a DSS threshold scheme introduced by Gennaro et
 al.\ \cite{Gennaro}.
-Since the scheme has a restriction such that $n \geq 2t$ in the $(t,
+Since the scheme has a restriction such as $n \geq 2t$ in the $(t,
 n)$-threshold scheme, we no longer be able to use the quorum threshold
 for $(t, n)$. But, we follow the protocols between the client and a
 quorum, i.e., the client sends a signing request to a quorum
-(multicast the message to all quorum members), then collect the
-responses. Our signing protocol consists of three phases:
+(multicast the message to all quorum members), then collects
+responses. The signing protocol consists of three phases:
 \begin{enumerate}
 \item Collect joint shared secrets generated by each quorum member
 \item Distribute the secrets to the quorum and calculate

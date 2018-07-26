@@ -2,13 +2,16 @@
 We look into attacks against the fundamental property:
 $READ(Q_1,x) = READ(Q_2,x)$ for $\forall Q_1, Q_2 \in QS$, which is
 known as equivocation.  The best that attackers can do is divide a
-clique into two sets and ask each set to sign $\langle x,t,v \rangle$
-and $\langle x,t,v' \rangle$ separately. Then do the {\em write}
-protocol for the target nodes with collected signature sets $S$ and
-$S'$. Honest servers will refuse the request because it does not
-satisfy the basic $b$-masking quorum condition: $|S| \geq b+1$. But
-with $b+1$ colluding nodes, the attack will succeed.
+clique into two sets ($\mathcal{H}_1$ and $\mathcal{H}_2$) and ask
+each set to sign $\langle x,t,v \rangle$ and $\langle x,t,v' \rangle$
+separately. Then do the {\sf write} protocol for the target nodes with
+collected signature sets $S$ and $S'$. Honest servers will refuse the
+request because it does not satisfy the basic $b$-masking quorum
+condition: $|S| \geq b+1$. But with $b+1$ colluding nodes
+($\mathcal{F}$), the attack will succeed.
 
+\ifdefined\ABSTRACT
+\else
 \newcommand{\slice}[4]{
   \pgfmathparse{0.5*#1+0.5*#2}
   \let\midangle\pgfmathresult
@@ -42,17 +45,17 @@ with $b+1$ colluding nodes, the attack will succeed.
   }
 
 \end{tikzpicture}
-
+\fi
 
 The maximum number of signatures dishonest clients can get is
-$b+(n-b)/2$. Therefore, to overcome the attack we need
-\[ n-b > b+(n-b)/2 \Rightarrow n > 3b \]
+$b+(n-b)/2$. Therefore, to overcome the attack we need:
+\[ n-b > b+(n-b)/2 \Rightarrow n > 3b. \]
 
-\subsubsection*{Detecting equivocation on read}
+\subsubsection*{Detecting equivocation on {\sf read}}
 Even if the number of faulty nodes exceeds the above threshold, the
-system can detect malicious actions with the following probability
+system can detect malicious actions with the following probability:
 \begin{align*}
-  F_p &= Pr[Q \cap \mathcal{H}_1 \neq \emptyset \wedge Q \cap
+  D_p &= Pr[Q \cap \mathcal{H}_1 \neq \emptyset \wedge Q \cap
         \mathcal{H}_2 \neq \emptyset] \\
       & = 1 - Pr[Q \subseteq \mathcal{F} \cup \mathcal{H}_1] \\
       & = 1 - ((n + f) / 2n)^{|Q|}
@@ -61,15 +64,16 @@ when $f > b$ and $|Q| < (f + n)/2$, where $f = |\mathcal{F}|$ is the
 number of the faulty nodes, assuming the sizes of $\mathcal{H}_1$ and
 $\mathcal{H}_2$ are the same.
 
-In the case of $f \le b$ the detection rate is always 100\% because it is
-guaranteed that clients can always find a valid value and anything
-other than that is the result of malicious actions. When the number of
-faulty nodes exceeds the threshold, i.e., $f > b$, it will be possible that
-the client cannot detect all malicious actions. Since the minimum
-quorum size is $(n-1)/3$ it does not need to consider the case where
-$|Q| < n/3$. Also, if the size exceeds $(f+n)/2$ any quorum always
-includes at least one node from each $\mathcal{H}_i$ which makes the
-detection rate 100\%.
+In the case of $f \le b$ malicious messages will never go through
+therefore it does not make sense to talk about the detection rate on
+{\sf read}, however, it is possible to detect malicious messages on
+{\sf write} if such actions are taken by clients.
+When the number of faulty nodes exceeds the threshold, i.e., $f > b$,
+it will be possible that the (honest) client cannot detect all
+malicious actions. Since the minimum quorum size is $(n-1)/3$ it does
+not need to consider the case where $|Q| < n/3$. Also, if the size
+exceeds $(f+n)/2$ any quorum always includes at least one node from
+each $\mathcal{H}_i$ which makes the detection rate 100\%.
 
 \ifdefined\ABSTRACT
 \else
@@ -86,7 +90,7 @@ detection rate 100\%.
 \end{tikzpicture}
 \fi
 
-For example, assume we choose a quorum $|Q| = 3b+1$ out of $n = 4b+1$,
+For example, assuming we choose a quorum $|Q| = 3b+1$ out of $n = 4b+1$,
 which is the default setup of the kv quorum system, the detection rate
 is 100\% up to $f = 2b$ failure nodes.
 

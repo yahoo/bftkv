@@ -7,7 +7,7 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \renewcommand{\theequation}{\arabic{equation}}
-\usepackage[ruled]{algorithm2e}
+\usepackage[ruled,noline]{algorithm2e}
 \usepackage{tikz}
 \usepackage{hyperref}
 
@@ -17,16 +17,18 @@
   Blockchain\\(Extended Abstract)\footnotemark[1]}
 
 \author{%
-  \textsc{Ryuji Ishiguro}
+  \textsc{Ryuji Ishiguro}\\
+  \normalsize \href{mailto:rishiguro@oath.com}{rishiguro@oath.com}\\
+  \normalsize \url{https://github.com/yahoo/bftkv}\\
 }
-\date{\today}
+%\date{\today}
 
 \usepackage{titling} % Customizing the title section
 \usepackage{abstract} % Allows abstract customization
 \renewcommand{\maketitlehookd}{%
-  \begin{center}
-    \url{https://github.com/yahoo/bftkv}
-  \end{center}
+%  \begin{center}
+%    \url{https://github.com/yahoo/bftkv}
+%  \end{center}
   \input{abstract}
 }
 

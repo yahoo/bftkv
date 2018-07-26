@@ -86,7 +86,7 @@ certificate to the quorum it belongs to.
 The node that has received the graph constructs its own local graph
 from the graphs, then sends the join request to nodes that have not
 been connected.
-See algorithm {\em Join} \ref{Join}.
+See algorithm {\sf Join} \ref{Join}.
 
 \subsection{Register}
 \label{register}
@@ -97,4 +97,4 @@ password secret. If it finds a certificate request that has the same
 ID as one of the stored certificates it will sign it only if the
 password authentication is done. The client will get a ``proof'' of
 the authentication when it is finished.
-See algorithm {\em Register} \ref{Register}
+See algorithm {\sf Register} \ref{Register}

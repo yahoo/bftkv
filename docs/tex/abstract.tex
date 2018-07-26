@@ -1,16 +1,20 @@
 \begin{abstract}
   \noindent
-  Most distributed key-value stores are tolerant to only benign failure,
-  which makes it difficult to run it on the public Internet without
-  additional security measures to protect data integrity from malicious
-  attacks. We developed a distributed key-value store that is tolerant
+  Most distributed key-value stores are tolerant to only benign
+  failure, which makes it difficult to run the system in an insecure
+  environment (i.e., the Internet) as single point of failure could
+  compromise the whole system.  Such systems not only are vulnerable to
+  malicious attacks, but also need to rely on centralized authorities to
+  protect data integrity.
+  We developed a distributed key-value store that is tolerant
   to Byzantine faults, keeping it in mind to run the system over the
-  public Internet. While data integrity is secured among distributed
+  public Internet without any central
+  authorities.  While data integrity is secured among distributed
   nodes, all transactions are transparent to anyone.
   The system provides not only a robust key-value store but also data
-  secrecy and distributed signing features by a threshold
+  secrecy and distributed signing features with a threshold
   cryptosystem. Integrating encryption and signature schemes with
-  Byzantine fault-tolerant protocols is much more robust than using
+  a Byzantine fault-tolerant protocol is much more robust than using
   separated KMS and PKI with an ordinary distributed key-value store,
   as it maximizes a benefit of distributed systems which fit very well
   with threshold cryptography. There is no single point of failure in

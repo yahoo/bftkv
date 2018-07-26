@@ -1,107 +1,114 @@
-\section*{Algorithms}
+\section{Algorithms}
 %
 % algorithms
 %
-\label{GetQC}
+\SetAlCapNameFnt{\sf}
+
 \begin{algorithm}
+\label{GetQC}
   \caption{GetQC}
-  \SetAlgoNoLine
-  \KwIn{$G$: a graph, $s$: the start node, $L$: the maximum distance}
-  $queue \leftarrow {(s, 0)}$\;
+  \KwIn{$G$: the graph, $s$: the start node, $L$: the maximum distance}
+  \KwOut{$QC$: quorum cliques}
+  \SetKwData{queue}{queue}
+  \SetKwFunction{FindMaximalClique}{FindMaximalClique}
+  \queue $\leftarrow {(s, 0)}$\;
   $QC = \{\}$\;
-  \Repeat{$queue = \{\}$}
+  \Repeat{\queue $= \emptyset$}
   {
-    $(v, d) \leftarrow dequeue()$\;
+    $(v, d) \leftarrow$ \queue\;
     \If{$d \ge L$}{break}
-    $QC = QC \cup \text{FindMaximalClique}(v)$\;
-    \For{each node $n \in v.adj$}
+    $QC = QC\; \cup$ \FindMaximalClique($G, v$)\;
+    \ForEach{$n \in v.adj$}
     {
-      enqueue($n, d + 1$) if $n$ has not been visited\;
+      \queue $\leftarrow (n, d + 1)$ if $n$ has not been visited\;
     }
   }
   Check if $\forall C_1, C_2 \in QC, C_1 \cap C_2 = \emptyset$\;
-  return $QC$
+  \Return{$QC$}
 \end{algorithm}
 
 \begin{algorithm}
   \caption{FindMaximalClique}
-  \SetAlgoNoLine
-  \KwIn{$G$: a graph, $s$: the start node}
-  $C \leftarrow {s}$\;
-  \For{$v \in G.V$}
+  \KwIn{$G$: the graph, $s$: the start node}
+  \KwOut{$C$: a clique}
+  $C \leftarrow \{s\}$\;
+  \ForEach{$v \in G.V$}
   {
-    $C = C + {v} \text{ if } (c_i, v) \text{ and } (v, c_i)
-    \text{ for } \forall c_i \in C$\;
+    $C = C \cup \{v\} \;\text{\bf if } (c_i, v) \in G.E \wedge (v, c_i) \in G.E \text{ for } \forall c_i \in C$\;
   }
-  \If{$|C| < 4$}{return $\bot$}
-  return $C$
+  \If{$|C| < 4$}{\Return{$\bot$}}
+  \Return{$C$}
 \end{algorithm}
 
-\label{CheckSigs}
 \begin{algorithm}
-  \caption{CheckSigs}
-  \SetAlgoNoLine
-  \KwIn{$S = \{S_i\}, S_i = Sign_{Q_i}(\langle x, t, v, s_C \rangle)$}
-  $Cliques = GetQC()$\;
-  \For{$clique \in Cliques$}
+\label{VerifyCollectiveSignatures}
+  \caption{VerifyCollectiveSignatures}
+  \SetKwFunction{GetQC}{GetQC}
+  \SetKwFunction{Verify}{Verify}
+  \KwIn{$G$: the graph, $S = \{S_i | S_i = Sign_{Q_i}(\langle x, t, v, s_C \rangle)\}$}
+  $QC = $ \GetQC($G, self$)\;
+  \ForEach{$C \in QC$}
   {
-    \If{not $VerifySS(clique, S)$}
+    $cnt = 0$\;
+    \ForEach{$s \in S \cap C$}
     {
-      return $False$\;
+      \If{\Verify($s$)}
+      {
+        $cnt++$\;
+      }
+    }
+    \If{$cnt \leq 2f$}
+    {
+      \Return{false}
     }
   }
-  return $True$\;
+  \Return{true}
 \end{algorithm}
 
+\begin{algorithm}
 \label{CheckQuorumCert}
-\begin{algorithm}
   \caption{CheckQuorumCert}
-  \SetAlgoNoLine
-  \KwIn{Cert}
-  $Clique = FindMaximalClique(self)$\;
-  $Counter = 0$\;
-  \For{each $c \in $ Cert}
+  \SetKwFunction{FindMaximalClique}{FindMaximalClique}
+  \KwIn{$G$: the graph, $Cert$: quorum certificate}
+  $C = $ \FindMaximalClique($self$)\;
+  $cnt = 0$\;
+  \ForEach{$c \in Cert$}
   {
-    \If{$c.Issuer \in Clique$ {\bf and} $Verify(c.Issuer,
-      c.Signature)$
-    }{
-      $Counter$++\;
+    \If{$c.Signer \in C$ {\bf and} \Verify(c.Signature)}
+    {
+      $cnt$++\;
     }
   }
-  \eIf{$Counter > 2 \cdot |Clique| / 3$}
-  {
-    return $True$\;
-  }{
-    return $False$\;
-  }
+  \Return{$cnt > (2 |C|) / 3$}
 \end{algorithm}
 
-\label{CheckEquivocation}
 \begin{algorithm}
-  \caption{Equivocation Check}
-  \SetAlgoNoLine
+\label{CheckEquivocation}
+  \caption{CheckEquivocation}
+  \SetKwData{Storage}{Storage}
+  \SetKwFunction{Revoke}{Revoke}
   \KwIn{$req = \langle x, t, v, s_C, S \rangle$}
-  $z = Store[x, t]$\;
+  $z = $ \Storage$[x, t]$\;
   \If{$z \neq \bot$ {\bf and} $req.v \neq z.v$}
   {
-    $Revoke(req.S \cap z.S)$\;
+    \Revoke($req.S \cap z.S$)\;
   }
 \end{algorithm}
 
-\label{CheckTOFU}
 \begin{algorithm}
-  \caption{TOFU enforcement}
-  \SetAlgoNoLine
+\label{CheckTOFU}
+  \caption{CheckTOFU}
+  \SetKwData{Storage}{Storage}
   \KwIn{$req = \langle x, t, v, s_C, S \rangle$}
   Verify $req.s_C$ with quorum certificate\;
-  \eIf{$Store[x, 0] = \bot$\;
+  \eIf{\Storage$[x, 0] = \bot$}
+  {
+    \Storage$[x, t] = req$\;
   }{
-    $Store[x, t] = req$\;
-  }{
-    $last = Store[x, t-1]$\;
-    \eIf{$last.s_C.cert.ID$ = $req.s_C.cert.ID$\;
-    }{
-      $Store[x, t] = req$\;
+    $last = $ \Storage$[x, t-1]$\;
+    \eIf{$last.s_C.cert.ID$ = $req.s_C.cert.ID$}
+    {
+      \Storage$[x, t] = req$\;
     }{
       Error\;
     }
@@ -111,10 +118,9 @@
 \ifdefined\ABSTRACT
 \else
 
-\label{Join}
 \begin{algorithm}
+\label{Join}
   \caption{Join}
-  \SetAlgoNoLine
   \KwIn{Cert}
   $G.V = Cert.sigs[*].cert$\;
   $peers = G.V$\;
@@ -132,10 +138,9 @@
   }
 \end{algorithm}
 
-\label{Register}
 \begin{algorithm}
+\label{Register}
   \caption{Register}
-  \SetAlgoNoLine
   \KwIn{$req$: a client certificate, $proof$: the proof of the password
     authentication}
   $found$ = $Store[req.x]$\;
