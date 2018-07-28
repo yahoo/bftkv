@@ -24,14 +24,15 @@ t$, correct $G_S$ cannot be obtained.
 
 \begin{proof}
 $S$ cannot be reconstructed from $|L|$ servers, from the SSS
-  property, thus $g_{\pi}^S$ cannot be constructed.
+  property, thus $g_{\pi}^S$ cannot be obtained.
 \end{proof}
 
 \subsection{Key Exchange}
-Under the DDH assumption \cite{boneh}, $K_i = g_{\pi}^{Ss_iab_i} \bmod
-p$ can be considered as $n$-party DH, i.e., given
-$g^{x_1x_2...x_{n-1}} \bmod p$ and $g^{x_n} \bmod p$ it is hard to
-compute $g^{x_1x_2...x_n} \bmod p$ without knowing a $x_n$.
+Since $g_{\pi}^{Ss_i}$ is a generator with high probability,
+$(g_{\pi}^{Ss_i})^{ab_i} \bmod p$ can be seen as the traditional DH
+key, and cannot be distinguished from a random field element under the
+DDH assumption \cite{boneh}.
+
 From the correctness lemma, the client correctly obtains
 $g_{\pi}^S$ from $t$ servers. Also since it knows the password it can
 calculate $g_{\pi}^{h(ID)}$. With the random DH exponent $a$ it can

@@ -2,7 +2,7 @@
   \noindent
   Most distributed key-value stores are tolerant to only benign
   failure, which makes it difficult to run the system in an insecure
-  environment (i.e., the Internet) as single point of failure could
+  environment (i.e., the Internet) as a single point of failure could
   compromise the whole system.  Such systems not only are vulnerable to
   malicious attacks, but also need to rely on centralized authorities to
   protect data integrity.
@@ -10,9 +10,10 @@
   to Byzantine faults, keeping it in mind to run the system over the
   public Internet without any central
   authorities.  While data integrity is secured among distributed
-  nodes, all transactions are transparent to anyone.
-  The system provides not only a robust key-value store but also data
-  secrecy and distributed signing features with a threshold
+  nodes, anyone can join / leave the network freely and can see all
+  transactions.
+  The system provides not only a robust key-value store but also
+  authentication, encryption and signing features with a threshold
   cryptosystem. Integrating encryption and signature schemes with
   a Byzantine fault-tolerant protocol is much more robust than using
   separated KMS and PKI with an ordinary distributed key-value store,

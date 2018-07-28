@@ -1,8 +1,8 @@
 \section{Protocols}
 \label{Protocols}
-The system uses Phalanx \cite{Delhi:2} for the underlying {\em
+The system uses Phalanx \cite{Delhi:2} for the underlying {\sf
 read/write} operations. To maintain a graph for the quorum system, we
-extend the protocols with {\em join/leave}. Also {\em register}
+extend the protocols with {\sf join/leave}. Also {\sf register}
 protocol is used to get quorum certificates with the threshold
 password authentication.
 
@@ -29,24 +29,24 @@ password authentication.
 
 \subsection{Read / Write}
 \label{rw}
-{\em read/write} protocols are done between a client ($C$) and a
+{\sf read/write} protocols are done between a client ($C$) and a
 quorum ($Q$). A quorum is chosen from a quorum system ($QS \subseteq
 2^U$) which is a subset of the powerset of all nodes ($U$).  To write
 a value $v$ into a variable $x$, we follow the write protocol
 specified in Phalanx.\\
 
-[ Write ]
+[ {\sf write} ]
 \begin{align*}
   C :& \text{ choose a quorum from quorum cliques} \\
      & Q \in QC \\
-  C \rightarrow Q :& \text{ {\em get timestamp}}(x) \\
+  C \rightarrow Q :& \text{ {\sf get timestamp}}(x) \\
   C \leftarrow Q_i :& \text{ } t_i \\
   C :& \text{ collect } 2b+1 \text{ timestamps: } \\
      & \text{ } \{t_i\}_{i \in \mathcal{T}}, |\mathcal{T}|=2b+1,
        \mathcal{T} \subseteq Q \\
   C :& \text{ choose the maximum timestamp } \\
      & \text{ } t = max(t_i) + 1 \\
-  C \rightarrow Q :& \text{ {\em get signature}}(\langle x, t, v, s_C \rangle),\\
+  C \rightarrow Q :& \text{ {\sf get signature}}(\langle x, t, v, s_C \rangle),\\
      & \text{ where } s_C = (Sign_C(\langle x, t, v \rangle), Cert_C) \\
   Q_i :& \text{ verify $s_C$ with $C$'s quorum certificates} \\
   Q_i :& \text{ check the TOFU policy} \\
@@ -60,20 +60,19 @@ specified in Phalanx.\\
   Q'_i :& \text{ store } \langle x, t, v, S_C, S \rangle
 \end{align*}
 
-[ Read ]
+[ {\sf read} ]
 \setcounter{equation}{0}
 \begin{align*}
-  C &: \text{choose a quorum } Q \in U \setminus QC \\
-  C \rightarrow Q &: read(x) \\
-  C \leftarrow Q_i &: M_i = \langle x, t, v, s_C, S \rangle \\
-  C &: \text{collect } f + 1 \text{ responses} \\
-  C &: \text{verify the signature set $S$} \\
-  C &: \text{do the equivocation check} \\
-  C &: \text{choose the latest timestamp } \\
-    & t_L = max(M_i.t) \\
-    & [ write back ] \\
-  C &: Q' = \{Q_i \subset Q | M_i.t < t_L\} \\
-  C \rightarrow Q' &: \text{{\em write back}}(\langle x, t_L, v, s_C, S \rangle)
+  C :&\; \text{choose a quorum } Q \in U \setminus QC \\
+  C \rightarrow Q :&\; read(x) \\
+  C \leftarrow Q_i :&\; M_i = \langle x, t, v, s_C, S \rangle \\
+  C :&\; \text{collect } f + 1 \text{ responses} \\
+  C :&\; \text{verify the signature set $S$} \\
+  C :&\; \text{do the equivocation check} \\
+  C :&\; \text{choose the latest timestamp } \\
+     &\; t_L = max(M_i.t) \\
+  C :&\; Q' = \{Q_i \subset Q | M_i.t < t_L\} \\
+  C \rightarrow Q' :&\; \text{{\sf write back}}(\langle x, t_L, v, s_C, S \rangle)
 \end{align*}
 
 

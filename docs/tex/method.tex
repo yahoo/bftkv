@@ -3,8 +3,8 @@ This section describes quorum systems based on the WoT graph, which
 are the main building blocks for our BFT protocols. Protocols are
 always between a client and a quorum. Every message must be signed by
 a set of special nodes called {\em Quorum Cliques}, and stored in
-another quorum called {\em KV quorum}. To write a key-value pair we
-perform the three step process:
+another quorum called {\em KV quorum}. To write a key-value pair the
+client performs the three step process:
 \ifdefined\ABSTRACT
 \footnote{Detailed protocols are described in the full paper.}
 \fi
@@ -13,8 +13,7 @@ perform the three step process:
 \item Request to sign the message to a quorum in the {\em Quorum Cliques},
 \item Write the signed message to a {\em KV quorum}.
 \end{enumerate}
-To read a key-value pair, the client collects key-value pairs from 
-a {\em KV quorum}:
+To read a key-value pair, the client performs the following process:
 \begin{enumerate}
 \item Collect key-value pairs from a {\em KV quorum}
 \item Choose the latest one
@@ -64,8 +63,9 @@ to the WoT graph, i.e., $G.E = G.E \cup \{(n_2, n_1)\}$.
 The quorum certificate not only constructs the graph but also gives
 permissions to clients to mutate the value.
 Every {\sf write} request includes the client's quorum certificate
-along with the self signed signature over $\langle x, t, v
-\rangle$. Each member of $QC$ verifies the signature and the quorum
+along with the self signed signature over the variable, timestamp and
+value which we denote $\langle x, t, v \rangle$.
+Each member of $QC$ verifies the signature and the quorum
 certificate before it sends back the signed message. See algorithms
 {\sf VerifyCollectiveSignatures} \ref{VerifyCollectiveSignatures} and
 {\sf CheckQuorumCert} \ref{CheckQuorumCert}.
@@ -78,15 +78,20 @@ certificates and the collective signatures, a node cannot be a
 member of more than one cliques, which means the compromised node has
 to sever the trust links to other nodes itself to make links with the
 colluding nodes, otherwise the clique can no longer be a member of a
-quorum. If such a faulty clique disagrees with other cliques consensus
-will be no longer established.
+quorum. If such a faulty clique disagrees with other cliques a
+consensus will be no longer established until clients exclude the
+compromised nodes.
 
 \subsection{Key-value Store}
 Once data is signed by quorum cliques it can be sent to other nodes
 that are not necessarily members of the cliques. Such nodes can form
 another quorum system and we call it {\em KV quorum}. The main purpose
 of this quorum system is to make sure that clients can retrieve the
-latest key-value:
+latest key-value. We no longer need the $b$-masking quorum as all
+messages are signed by quorum cliques which have already handled the
+faulty client case. {\em KV quorum} handles only $f$ benign faulty
+nodes. The {\sf read} process writes back the latest message to nodes
+that keeps old values:
 \begin{enumerate}
 \item The client collects $f + 1$ responses and chooses one which
   has the latest timestamp.
@@ -97,7 +102,7 @@ latest key-value:
 \else
 See ~\ref{rw} for the actual protocols.
 \fi
-Also for load balancing, {\em KV quorum} is typically chosen from $U
+For load balancing, {\em KV quorum} is typically chosen from $U
 \setminus\; QC$.
 
 Each member of {\em KV quorum} must check equivocation and the
@@ -133,8 +138,8 @@ integrity. The TOFU policy with the quorum certificate prevents
 unauthorized mutations. The collective signatures make it possible to
 check equivocation. All those functions rely on the digital signature
 scheme therefore managing the signing key is significantly
-important. We use a threshold password authentication ($\mathcal{TPA}$)
-for:
+important for this system. We use a threshold password authentication
+($\mathcal{TPA}$) for:
 \begin{itemize}
 \item enrolling nodes to the system
 \item recovering from a key-loss situation
@@ -148,7 +153,7 @@ but the shared secret is calculated by Shamir's Secret Sharing (SSS)
 \cite{shamir}.\\
 
 To set up the {\em shares} the client generates a random polynomial
-for $(t, n)$ SSS on a prime field $\mathbb{Z}_q$, s.t.,
+for $(t, n)$ SSS over a prime field $\mathbb{Z}_q$, s.t.,
 \[
   f(x) = \sum_{i=0}^{t-1}a_ix^i \bmod q
 \]
@@ -261,16 +266,16 @@ user.\\
 \noindent
 Enrollment:
 \begin{enumerate}
-\item Generate a unique ID and a key pair.
-\item Send the certificate to a quorum with a password to get a
+\item Generate a unique ID and a key pair,
+\item Send the certificate to a quorum with the {\em shares} to get a
   quorum certificate.
 \end{enumerate}
 
 \noindent
 Key recovery / secondary key generation:
 \begin{enumerate}
-\item Generate a new key pair with the existing ID.
-\item Do the password authentication and get a proof.
+\item Generate a new key pair with the existing ID,
+\item Do the password authentication and get a proof,
 \item With the proof send the new certificate to a quorum to get a new
   quorum certificate.
 \end{enumerate}
@@ -281,7 +286,7 @@ See \ref{register} for the actual protocols.
 
 \subsubsection*{$\mathcal{TPA}$ for Data Secrecy}
 The system provides a roaming service to store and access encrypted
-data. Users encrypt the value at a node then send the encrypted value
+data. Users encrypt a value at a node then send the encrypted value
 to a quorum. They can decrypt the value at any node with the
 password. The password is stored along with $\langle x, t, v \rangle$.
 The encryption key is $h(g_{\pi}^S)$. $S$ (and the random polynomial
@@ -294,39 +299,39 @@ process first to get the proof. With the proof the client proceeds the
 {\sf read} process and decrypts the value with the above key.
 
 \subsection{Distributed Signing}
-Some crypto-currency systems still use simple digital signature
+Some crypto-currency platforms still use simple digital signature
 schemes to sign transactions. If private keys are stolen all assets
-can be transferred to someone's address without an authorization of
+can be transferred to someone's address without authorization from
 the original users. One of ways to mitigate such situation is to
 use {\em multi-sig}. With the multi-sig scheme multiple parties need
 to be involved in the signning process. Most systems adopt multi-sig
 as an add-on security measure to the blockchain technologies. BFTKV
 natively supports distributed signing schemes based on threshold
 cryptography, which is compatible with the standard algorithms
-therefore the verifiers do not need to change any way to process the
+therefore the verifiers do not need to change the way to process the
 transactions.
 
 As a PKI platform, protecting CA's private keys must be the most
 important {\em feature}. At the same time, certificate signing
 requests should be processed quickly and automatically. The
-distributed signing feature satisfies those mandate requirements.
+distributed signing feature satisfies those conflicting requirements.
 
 The system takes advantages of the distributed platform to make a
 signature without revealing the private key. Once the key is
 distributed among quorum members, the complete private key will never
 appear at any server or client. The system supports three
 signature algorithms: RSA (PKCS1.5), DSA and ECDSA. Our scheme takes
-existing keys as-is and distributes it to multiple servers, which
-makes it easy to migrate.
+existing keys as-is and distributes it to multiple servers, which will
+make it easy to migrate from existing systems.
 
 \subsubsection*{RSA}
-It is straightforward to construct a $(n, n)$ ``threshold'' scheme on
+It is straightforward to construct a $(n, n)$ ``threshold'' scheme with
 RSA \cite{garay,rabin}. Decompose the private key $d$ into $\{d_i\}_{i =
-1..n} \; s.t., d = \sum_{i=1}^{n} d_i \bmod \varphi(N)$, and the
+1..n} \; \text{s.t., } d = \sum_{i=1}^{n} d_i \bmod \varphi(N)$, and the
 signature is calculated from partial signatures $S_i = M^{d_i} \bmod
-N$ then
+N$:
 \[
-  S = \prod_{i=1}^{n} S_i = M^d \bmod N
+  S = \prod_{i=1}^{n} S_i = M^d \bmod N.
 \]
 
 To convert the $(n, n)$ threshold scheme to a somewhat $(t, n)$
@@ -350,21 +355,19 @@ where $S_2 = \prod_{i \in \{21,23,24,25\}} S_i \bmod N$.
   child {node(5) {5}};
 \end{tikzpicture}
 
-The number of keys each node needs to keep will be increased
-exponentially as $n - k$ becomes big. Up to $(7,10)$ threshold seems
-practical.
+The number of keys stored in each node will be increased exponentially
+as $n - k$ becomes big. Up to $(7,10)$ threshold seems practical.
 
 \subsubsection*{DSA, ECDSA}
 BFTKV implements a DSS threshold scheme introduced by Gennaro et
 al.\ \cite{Gennaro}.
 Since the scheme has a restriction such as $n \geq 2t$ in the $(t,
 n)$-threshold scheme, we no longer be able to use the quorum threshold
-for $(t, n)$. But, we follow the protocols between the client and a
-quorum, i.e., the client sends a signing request to a quorum
-(multicast the message to all quorum members), then collects
-responses. The signing protocol consists of three phases:
+for $(t, n)$, but we follow the protocols between the client and a
+quorum. The signing protocol consists of three phases:
 \begin{enumerate}
-\item Collect joint shared secrets generated by each quorum member
+\item Collect joint shared secrets generated by each quorum member:
+  $\{(i, f_j(i)) | f_j(0) = k_j\}_{\{i = 1 \dots n, j \in Q\}}$
 \item Distribute the secrets to the quorum and calculate
   $r=g^{k^{-1}} \bmod p \bmod q$ where $k$ is the
   joint Shamir's shared secret (i.e., $k = \sum k_i$)

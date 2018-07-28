@@ -121,6 +121,8 @@
 \begin{algorithm}
 \label{Join}
   \caption{Join}
+  \SetKwFunction{Send}{Send}
+  \SetKwFunction{Receive}{Receive}
   \KwIn{Cert}
   $G.V = Cert.sigs[*].cert$\;
   $peers = G.V$\;
@@ -129,8 +131,8 @@
     $newPeers = \{\}$\;
     \For{$peer \in peers$}
     {
-      Send $Cert$ to $peer.addr$\;
-      $certs = $ Receive()\;
+      \Send($peer.addr, Cert$)\;
+      $certs = $ \Receive()\;
       $newPeers = newPeers \cup (certs \setminus G.V$)\;
       $G.V = G.V \cup certs$\;
     }
@@ -141,16 +143,19 @@
 \begin{algorithm}
 \label{Register}
   \caption{Register}
+  \SetKwData{Storage}{Storage}
+  \SetKwFunction{FindMaximalClique}{FindMaximalClique}
+  \SetKwFunction{Sign}{Sign}
   \KwIn{$req$: a client certificate, $proof$: the proof of the password
     authentication}
-  $found$ = $Store[req.x]$\;
-  \If{$found \neq \bot$ {\bf and} $req.s_C.ID = found.s_C.ID$}
+  $z = $ \Storage$[req.x]$\;
+  \If{$z \neq \bot$ {\bf and} $req.s_C.ID = z.s_C.ID$}
   {
-    $clique = FindMaximalClique(self)$\;
+    $clique = $ \FindMaximalClique($self$)\;
     \If{$proof \subseteq clique$ {\bf and} $|proof| \ge
       |clique|\cdot2/3$}
     {
-      $Sign(req)$\;
+      \Sign($req$)\;
     }
   }
 \end{algorithm}

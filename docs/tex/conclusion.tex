@@ -6,8 +6,8 @@
 We developed an efficient and secure distributed key-value store which
 can be a solution for a long standing problem: How to authenticate
 public keys without relying on central authorities. Here is a quote
-from the Sesame algorithm which is a part of the Signal protocol
-\cite{signal}.
+from ``The Sesame Algorithm'' \cite{signal} which is a part of the
+Signal protocol:
 \begin{quote}
 ``Sesame relies on users to authenticate identity public keys with their
 correspondents. For example, a pair of users might compare public key
@@ -22,11 +22,11 @@ BFTKV is designed to be the last piece of this kind of real end-to-end
 encryption system.
 
 We also integrated unique threshold password authentication and
-signatures schemes with a Byzantine fault-tolerant key-value store to
-solve nasty problems like unauthorized enrollment, recovering from a
-key-loss situation and supporting multiple devices under the same ID,
-which most permissioned blockchain systems will suffer when they
-actually try to deploy a system.
+distributed signature schemes with a Byzantine fault-tolerant
+key-value store to solve nasty problems like unauthorized enrollment,
+recovering from a key-loss situation and supporting multiple devices
+under the same ID, which most permissioned blockchain systems will
+suffer when they actually try to deploy a system.
 
 \ifdefined\ABSTRACT
 \else
