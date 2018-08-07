@@ -197,9 +197,11 @@ To get a password authenticated:
     \lambda_j = \prod_{l \in \mathcal{T} \setminus \{j\}}
     i_l / (i_l - i_j) \bmod q.
   \]
-  Then, for each server $i \in \mathcal{T}$, calculate and send back:
+  Then, generate another random number $a' \xleftarrow{\mathcal{R}}
+  \mathbb{Z}_q$ and for each server $i \in \mathcal{T}$, calculate and
+  send back:
   \[
-    X_i = G_S^{s_i} \bmod p
+    X_i = G_S^{a's_i} \bmod p
   \]
   where
   \[
@@ -221,9 +223,9 @@ To get a password authenticated:
 
 \item The client decrypts $Z_i$ with
   \[
-    K_i = B_i^{a} \bmod p
+    K_i = B_i^{aa'} \bmod p
   \]
-  and get:
+  and gets:
   \[
     (P_i, N) = D_{h(K_i)}(Z_i).
   \]
@@ -267,8 +269,8 @@ user.\\
 Enrollment:
 \begin{enumerate}
 \item Generate a unique ID and a key pair,
-\item Send the certificate to a quorum with the {\em shares} to get a
-  quorum certificate.
+\item Send the certificate signing request to a quorum with the
+  $\mathcal{TPA}$ {\em shares} to get a quorum certificate.
 \end{enumerate}
 
 \noindent
@@ -276,7 +278,7 @@ Key recovery / secondary key generation:
 \begin{enumerate}
 \item Generate a new key pair with the existing ID,
 \item Do the password authentication and get a proof,
-\item With the proof send the new certificate to a quorum to get a new
+\item With the proof, send the new certificate to a quorum to get a new
   quorum certificate.
 \end{enumerate}
 \ifdefined\ABSTRACT
@@ -297,6 +299,11 @@ To decrypt the data the user specifies the variable $x$ along with the
 password then the client starts the threshold password authentication
 process first to get the proof. With the proof the client proceeds the
 {\sf read} process and decrypts the value with the above key.
+
+With this roaming scheme, BFTKV can be a secure vault that is not only
+fault-tolerant for high availability but immune to single point of
+failures. The same kv storage can be used to keep both public / private
+keys without relying on a separated KMS.
 
 \subsection{Distributed Signing}
 Some crypto-currency platforms still use simple digital signature

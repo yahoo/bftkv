@@ -9,12 +9,12 @@ $G_S$ will be:
 \]
 and by raising $s_i = g_{\pi}^{h(ID_i)} \bmod p$ to $G_S$, we get:
 \[
-  X_i = G_S^{s_i} = (g_{\pi}^{Ssi})^a \bmod p
+  X_i = G_S^{s_i} = (g_{\pi}^{Ssi})^{aa'} \bmod p
 \]
-which must be the same as $v_i^a \bmod p$ for each $i \in
+which must be the same as $v_i^{aa'} \bmod p$ for each $i \in
 \mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
 step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
-share DH keys $K_i = g_{\pi}^{Ss_iab_i} \bmod p$.
+share DH keys $K_i = g_{\pi}^{Ss_iaa'b_i} \bmod p$.
 
 \begin{lemma}
 \label{tpa1}
@@ -27,7 +27,16 @@ $S$ cannot be reconstructed from $|L|$ servers, from the SSS
   property, thus $g_{\pi}^S$ cannot be obtained.
 \end{proof}
 
-\subsection{Key Exchange}
+\subsection{Protocol Analysis}
+We look into the protocols by dividing it into two parts: the first
+roundtrip (process 1 and 2) is to recover the shared secret $S$, and
+the second roundtrip (process 3 and 4) is for key exchange.
+
+$g_{\pi} = \pi^2 \bmod p$, where $\pi$ is a secure hash value over the
+password, is a safe generator in $\mathbb{Z}^*_p$ with high
+probability. Raise a random exponent $a$ to mask the generator at the
+step 1. 
+
 Since $g_{\pi}^{Ss_i}$ is a generator with high probability,
 $(g_{\pi}^{Ss_i})^{ab_i} \bmod p$ can be seen as the traditional DH
 key, and cannot be distinguished from a random field element under the
@@ -43,16 +52,45 @@ on $B_i$. Unless the client can obtain $b_i$ it cannot calculate $K_i$
 from a made up DH term. Thus the client has no choice but to calculate
 $B_i^a \bmod p$ to obtain $K_i$.
 
-\subsection{(In)possibility of offline dictionary attacks}
+\subsection{Resistance to MiTM}
 Assume we have $\mathcal{L} < t$ compromised servers and try to
 reconstruct $g_{\pi}^S \bmod p$ from ${y_i}$. From the Lemma
 ~\ref{tpa1} we need at least one $Y_i$, $i \notin \mathcal{L}$, and
 unless the server $i$ is not compromised the only way to get $Y_i$ is
 to issue the protocol $X = g_{\pi}^a \bmod p$. Unless the attacker
-knows $\pi$ all he can do is to guess the password and to keep ask the
-server to calculate $Y_i = g_{\pi'}^a \bmod p$ for $\pi'$. If the
+knows $\pi$ all he can do is to guess the password and to keep asking
+the server to calculate $Y_i = g_{\pi'}^a \bmod p$ for $\pi'$. If the
 guess is wrong $Y'_i$ will not calculate $g_{\pi}^S$ with the
 compromised data $\{f(j)\}_{j \in \mathcal{L}}$.
 Unless the attacker can calculate $S$ from $g^S \bmod p$ with a
 fabricated $g$, he cannot calculate $g_{\pi'}^S \bmod p$ in
 order to brute force for $g_{\pi'} \notin \{g^e | e = 1..p-1\}$.
+
+\subsection{Resistance to offline dictionary attacks}
+Under the same condition of MiTM, what the client can obtain is:
+\begin{align*}
+  y_i &= f(i) \\
+  v_i &= g_{\pi}^{Ssi} \bmod p
+\end{align*}
+for $i \in \mathcal{L}$. We also get $G_S = g_{\pi}^{aS} \bmod p$ from
+the step 2, and $Z_i = E_{h(K_i)}(Pi, X_i||Y_i)$ from the step
+4. $B_i$ will not contribute anything the attack as we already have
+$v_i$.
+To brute force on $v_i$ there are two possible ways:
+\begin{enumerate}
+\item $\exists S \in \mathbb{Z}_q$ check if
+  $v_i \stackrel{\text{\tiny ?}}{=} (g_{\pi}^{s_i})^S \bmod p$
+  for each $g_{\pi}^{s_i}$ \\
+\item $\exists g_{\pi} \in \mathbb{Z}^*_q$ check if
+  $v_i \stackrel{\text{\tiny ?}}{=} (g_{\pi}^S)^{s_i} \bmod p$
+  for each $s_i$
+\end{enumerate}
+For the former case we need $S$ and for the latter case we need
+$g_{\pi}^S$. From the protocol 1, we can obtain either $g^S \bmod p$
+for $\forall g \in \mathbb{Z}$ or $g_{\pi}^{aS} \bmod p$. Obtaining
+$S$ is simply the {\sf DLOG} problem. $g_{\pi}^S \bmod p$ can be
+obtained iff $g$ happens to be $g_{\pi}$ or a legitimate client
+chooses $a = 1$ which must be excluded.
+
+$g^e = \pi^2$, we cannot calculate $e$ from $\pi^2$. To brute force on
+$e$, we get $P_i = P_r[g^i \in Dict]$.
