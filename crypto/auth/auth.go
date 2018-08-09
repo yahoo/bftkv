@@ -17,21 +17,17 @@ import (
 	"github.com/yahoo/bftkv/packet"
 )
 
-type Auth struct {
-}
-
 type AuthPartialSecret struct {
 	sss.Coordinate
-	B *big.Int
-	aux []byte
+	salt []byte
+	a2 *big.Int	// a': the second random exp
+	Xi *big.Int
 }
 
 type AuthClient struct {
 	password []byte
-	pi *big.Int
-	a *big.Int	// random exp
-	a2 *big.Int	// a - g^pi
-	ss *big.Int	// shared secret g^S (S=a[0])
+	a *big.Int	// a: the primary random exp
+	gs *big.Int	// shared secret g_pi^(a*S)
 	X *big.Int
 	results map[uint64]*AuthPartialSecret
 	k, n int
@@ -43,8 +39,6 @@ type AuthParams struct {
 	v *big.Int
 	salt []byte
 }
-
-const SALT_SIZE = 16
 
 var (
 	// has to be a safe prime, i.e., p = 2q + 1
@@ -79,39 +73,12 @@ var (
 		0xb8, 0xa6, 0x17, 0x74, 0xd3, 0xaf, 0x3f, 0x1c, 0xce,
 		0x2b, 0x95, 0xda, 0xd3,
 	}
-	gb = []byte{3}
-	p *big.Int
-	phi *big.Int
-	q *big.Int
-	g *big.Int
-	k *big.Int
-	nonce = []byte{0x94, 0x33, 0xa0, 0x1b, 0xcc, 0x09, 0x20, 0x6f}
+	p *big.Int = new(big.Int).SetBytes(pb)
+	phi *big.Int = new(big.Int).Sub(p, big.NewInt(1))
+	q *big.Int = new(big.Int).Div(phi, big.NewInt(2))
 )
 
-func New() crypto.Authentication {
-	if p == nil {
-		// p = 2q + 1
-		p = new(big.Int).SetBytes(pb)
-		phi = new(big.Int).Sub(p, big.NewInt(1))
-		q = new(big.Int).Div(phi, big.NewInt(2))
-	}
-	if g == nil {
-		g = new(big.Int).SetBytes(gb)
-	}
-	if k == nil {
-		k = new(big.Int).SetBytes(hash(pb, gb))
-	}
-	return &Auth{}
-}
-
-func (a *Auth) GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error) {
-	// pi = h(cred, salt), g^pi
-	salt := make([]byte, SALT_SIZE)
-	if _, err := rand.Read(salt); err != nil {
-		return nil, err
-	}
-	pi := PI(cred, salt)
-
+func GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error) {
 	// calculate sss coordinates
 	s, err := rand.Int(rand.Reader, q)	// the secret
 	if err != nil {
@@ -122,21 +89,25 @@ func (a *Auth) GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]b
 		return nil, err
 	}
 
-	// x = pi * g^s, v = g^x
-	x := new(big.Int)
-	x.Mod(x.Mul(pi, x.Exp(g, s, p)), p)
-	v := new(big.Int).Exp(g, x, p)
+	// g_pi = pi^2 mod p
+	pi := PI(cred, nil)
+
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, err
+	}
 
 	var res [][]byte
-	t := new(big.Int)
-	gpi := new(big.Int).Exp(g, PI(cred, nil), q)	// salt = nil
 	for i := 0; i < n; i++ {
 		c := coordinates[i]
 		var params AuthParams
 		params.x = c.X
-		params.y = new(big.Int).Mod(t.Add(c.Y, gpi), q)	// f(x) + g^pi
-		params.v = v
-		params.salt = salt
+		params.y = c.Y
+		params.salt = hash(salt, []byte{byte(i)})
+		si := new(big.Int).SetBytes(hash(cred, params.salt))	// si = PI(pass, hash(salt, i))
+		si.Mod(si.Mul(si, s), q)
+		params.v = new(big.Int).Exp(pi, si, p)	// vi = g_pi^(S*si)
+
 		ss, err := serializeParams(&params)
 		if err != nil {
 			return nil, err
@@ -146,7 +117,17 @@ func (a *Auth) GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]b
 	return res, nil
 }
 
-func (a *Auth) MakeResponse(ss []byte, challenge []byte, plain []byte) (res []byte, err error) {
+func MakeYi(ss []byte, X []byte) (res []byte, err error) {
+	params, err := parseParams(ss)
+	if err != nil {
+		return nil, err
+	}
+	Yi := new(big.Int).SetBytes(X)
+	Yi.Exp(Yi, params.y, p)
+	return serializeYi(params.x, Yi, params.salt)
+}
+
+func MakeBi(ss []byte, Xi []byte, proof []byte) (res []byte, err error) {
 	params, err := parseParams(ss)
 	if err != nil {
 		return nil, err
@@ -156,21 +137,14 @@ func (a *Auth) MakeResponse(ss []byte, challenge []byte, plain []byte) (res []by
 		return nil, err
 	}
 
-	// Bi = kv + g^b
-	t1 := new(big.Int)
-	t2 := new(big.Int)
-	kv := t1.Mod(t1.Mul(k, params.v), p)
-	Bi := t2.Mod(t2.Add(kv, t2.Exp(g, b, p)), p)
+	// Bi = v_i^b
+	Bi := new(big.Int)
+	Bi.Exp(params.v, b, p)
 
-	// KS = (X * v^u)^b
-	t := new(big.Int)
-	X := new(big.Int).SetBytes(challenge)
-	u := new(big.Int).SetBytes(hash(challenge, Bi.Bytes()))
-	t.Exp(t.Mod(t.Mul(X, t.Exp(params.v, u, p)), p), b, p)
-	ks := t.Bytes()
-
-	// Yi = X*g^y
-	Yi := new(big.Int).Mod(new(big.Int).Mul(X, new(big.Int).Exp(g, params.y, p)), p)	// g^(a+fi)
+	// Ki = Xi^b
+	Ki := new(big.Int).SetBytes(Xi)
+	Ki.Exp(Ki, b, p)
+	ks := Ki.Bytes()
 
 	// encrypt the data with ks
 	block, err := aes.NewCipher(hash(ks))
@@ -181,11 +155,15 @@ func (a *Auth) MakeResponse(ss []byte, challenge []byte, plain []byte) (res []by
 	if err != nil {
 		return nil, err
 	}
-	cipherData := aead.Seal(nil, genNonce(aead.NonceSize()), plain, append(X.Bytes(), Bi.Bytes()...))
-	return serializeResponse(Yi, params.x, Bi, params.salt, cipherData)
+	nonce := make([]byte, aead.NonceSize())		// random nonce is ok as the key is never reused
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	Zi := aead.Seal(nil, nonce, proof, append(Xi, Bi.Bytes()...))
+	return serializeBi(Bi, Zi, nonce)
 }
 
-func (a *Auth) NewClient(cred []byte, n, k int) crypto.AuthenticationClient {
+func NewClient(cred []byte, n, k int) crypto.AuthenticationClient {
 	return &AuthClient{
 		password: cred,
 		results: make(map[uint64]*AuthPartialSecret),
@@ -194,43 +172,54 @@ func (a *Auth) NewClient(cred []byte, n, k int) crypto.AuthenticationClient {
 	}
 }
 
-func (c *AuthClient) GenerateAuthenticationData() ([]byte, error) {
+func (c *AuthClient) GenerateX() ([]byte, error) {
 	a, err := rand.Int(rand.Reader, q)
 	if err != nil {
 		return nil, err
 	}
-	gpi := new(big.Int).Exp(g, PI(c.password, nil), q)	// salt = nil
+	X := new(big.Int).Exp(PI(c.password, nil), a, p)
 	c.a = a
-	t := new(big.Int).Sub(a, gpi)
-	t.Mod(t, q)
-	c.a2 = t
-	c.X = new(big.Int).Exp(g, t, p)		// g^(a - g^pi)
-	return c.X.Bytes(), nil
+	return X.Bytes(), nil
 }
 
-func (c *AuthClient) ProcessAuthResponse(res []byte, id uint64) (bool, error) {
-	Yi, x, Bi, salt, aux, err := parseResponse(res)
-	if err != nil {
-		return false, nil
-	}
-
-	c.pi = PI(c.password, salt)
-	inv := new(big.Int).Sub(q, c.a)		// t = -a mod q
-	gy := new(big.Int).Mul(Yi, new(big.Int).Exp(g, inv, p))		// Yi*t = g^(a+f(i))*g^-a = g^f(i)
-	gy.Mod(gy, p)
-
-	c.results[id] = &AuthPartialSecret{sss.Coordinate{X: x, Y: gy}, Bi, aux}
-	if len(c.results) == c.k {
-		c.ss = c.calculateSharedSecret()
-	}
-	return c.ss != nil, nil
-}
-
-func (c *AuthClient) GetAuxData(id uint64) ([]byte, error) {
-	ks, err := c.getSessionKey(id)
+func (c *AuthClient) ProcessYi(res []byte, id uint64) (Xis map[uint64][]byte, err error) {
+	x, Yi, salt, err := parseYi(res)
 	if err != nil {
 		return nil, err
 	}
+	c.results[id] = &AuthPartialSecret{sss.Coordinate{X: x, Y: Yi}, salt, nil, nil}
+	if len(c.results) >= c.k {
+		c.gs = c.calculateSharedSecret()
+		Xis = make(map[uint64][]byte)
+		for id, peer := range c.results {
+			a2, err := rand.Int(rand.Reader, q)
+			if err != nil {
+				return nil, nil
+			}
+			peer.a2 = a2
+			si := new(big.Int).SetBytes(hash(c.password, peer.salt))
+			e := new(big.Int).Mod(new(big.Int).Mul(a2, si), q)
+			Xi := new(big.Int).Exp(c.gs, e, p)
+			peer.Xi = Xi
+			Xis[id] = Xi.Bytes()
+		}
+	}
+	return Xis, nil
+}
+
+func (c *AuthClient) ProcessBi(res []byte, id uint64) (proof []byte, err error) {
+	Bi, Zi, nonce, err := parseBi(res)
+	if err != nil {
+		return nil, err
+	}
+	peer, ok := c.results[id]
+	if !ok {
+		return nil, crypto.ErrNoAuthenticationData
+	}
+	e := new(big.Int).Mul(c.a, peer.a2)
+	e.Mod(e, q)
+	Ki := new(big.Int).Exp(Bi, e, p)
+	ks := Ki.Bytes()
 	block, err := aes.NewCipher(hash(ks))
 	if err != nil {
 		return nil, err
@@ -239,21 +228,20 @@ func (c *AuthClient) GetAuxData(id uint64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := c.results[id]
-	Bi := res.B
-	plain, err := aead.Open(nil, genNonce(aead.NonceSize()), res.aux, append(c.X.Bytes(), Bi.Bytes()...))
+	proof, err = aead.Open(nil, nonce, Zi, append(peer.Xi.Bytes(), Bi.Bytes()...))
 	if err != nil {
 		return nil, crypto.ErrDecryptionFailed
 	}
-	return plain, err
+	return proof, err
 }
 
 func (c *AuthClient) GetCipherKey() ([]byte, error) {
-	if c.ss == nil || c.pi == nil {
+	if c.gs == nil {
 		return nil, crypto.ErrInsufficientNumberOfSecrets
 	}
-	t := new(big.Int)
-	return hash(t.Mod(t.Mul(c.pi, c.ss), p).Bytes()), nil
+	ainv := new(big.Int).ModInverse(c.a, q)
+	gs := new(big.Int).Exp(c.gs, ainv, p)
+	return hash(gs.Bytes(), c.password), nil
 }
 
 func (c *AuthClient) calculateSharedSecret() *big.Int {
@@ -271,35 +259,10 @@ func (c *AuthClient) calculateSharedSecret() *big.Int {
 	return gs
 }
 
-func (c *AuthClient) getSessionKey(id uint64) ([]byte, error) {
-	if c.ss == nil || c.pi == nil {
-		return nil, crypto.ErrInsufficientNumberOfSecrets
-	}
-	result, ok := c.results[id]
-	if !ok {
-		return nil, crypto.ErrKeyNotFound
-	}
-
-	// x = pi * g^s
-	x := new(big.Int)
-	x.Mul(c.pi, c.ss)
-	x.Mod(x, p)
-
-	// u = H(X, Bi)
-	Bi := result.B
-	u := new(big.Int).SetBytes(hash(c.X.Bytes(), Bi.Bytes()))
-	// (Bi - kg^x)^(a+ux)
-	t := new(big.Int)
-	e := new(big.Int)
-	t.Mod(t.Sub(Bi, t.Mod(t.Mul(k, t.Exp(g, x, p)), p)), p)	// Bi - kg^x
-	e.Mod(e.Add(c.a2, e.Mod(e.Mul(u, x), phi)), phi)	// e=a+ux
-	return new(big.Int).Exp(t, e, p).Bytes(), nil		// ks = (Bi - kg^x)^e
-}
-
 func PI(password, salt []byte) *big.Int {
 	t := new(big.Int)
 	t.SetBytes(hash(password, salt))
-	return t.Mod(t, q)
+	return t.Mod(t.Mul(t, t), q)
 }
 
 func hash(args ...[]byte) []byte {
@@ -308,14 +271,6 @@ func hash(args ...[]byte) []byte {
 		sha.Write(arg)
 	}
 	return sha.Sum(nil)
-}
-
-func genNonce(sz int) []byte {
-	var res []byte
-	for len(res) < sz {
-		res = append(res, nonce...)
-	}
-	return res[0:sz]
 }
 
 func writeBigInt(w *bytes.Buffer, b *big.Int) error {
@@ -368,43 +323,59 @@ func parseParams(ss []byte) (*AuthParams, error) {
 	return params, nil
 }
 
-func serializeResponse(Y *big.Int, x int, B *big.Int, salt []byte, aux []byte) ([]byte, error) {
+func serializeYi(x int, Y *big.Int, salt []byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	if err := writeBigInt(buf, Y); err != nil {
-		return nil, err
-	}
 	if err := binary.Write(buf, binary.BigEndian, int32(x)); err != nil {
 		return nil, err
 	}
-	if err := writeBigInt(buf, B); err != nil {
+	if err := writeBigInt(buf, Y); err != nil {
 		return nil, err
 	}
 	if err := packet.WriteChunk(buf, salt); err != nil {
 		return nil, err
 	}
-	if err := packet.WriteChunk(buf, aux); err != nil {
-		return nil, err
-	}
 	return buf.Bytes(), nil
 }
 
-func parseResponse(res []byte) (Y *big.Int, x int, B *big.Int, salt []byte, aux []byte, err error) {
+func parseYi(res []byte) (x int, Y *big.Int, salt []byte, err error) {
 	r := bytes.NewReader(res)
 	var t int32
-	if Y, err = readBigInt(r); err != nil {
-		return
-	}
 	if err = binary.Read(r, binary.BigEndian, &t); err != nil {
 		return
 	}
 	x = int(t)
-	if B, err = readBigInt(r); err != nil {
+	if Y, err = readBigInt(r); err != nil {
 		return
 	}
 	if salt, err = packet.ReadChunk(r); err != nil {
 		return
 	}
-	if aux, err = packet.ReadChunk(r); err != nil {
+	return
+}
+
+func serializeBi(Bi *big.Int, Zi []byte, nonce []byte) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := writeBigInt(buf, Bi); err != nil {
+		return nil, err
+	}
+	if err := packet.WriteChunk(buf, Zi); err != nil {
+		return nil, err
+	}
+	if err := packet.WriteChunk(buf, nonce); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func parseBi(res []byte) (Bi *big.Int, Zi []byte, nonce []byte, err error) {
+	r := bytes.NewReader(res)
+	if Bi, err = readBigInt(r); err != nil {
+		return
+	}
+	if Zi, err = packet.ReadChunk(r); err != nil {
+		return
+	}
+	if nonce, err = packet.ReadChunk(r); err != nil {
 		return
 	}
 	return

@@ -248,8 +248,13 @@ func SerializeSignature(sig *SignaturePacket) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func ParseAuthenticationRequest(pkt []byte) (variable []byte, adata []byte, err error) {
+func ParseAuthenticationRequest(pkt []byte) (phase int, variable []byte, adata []byte, err error) {
 	r := bytes.NewReader(pkt)
+	b, err := r.ReadByte()
+	if err != nil {
+		return
+	}
+	phase = int(b)
 	if variable, err = ReadChunk(r); err != nil {
 		return
 	}
@@ -259,8 +264,11 @@ func ParseAuthenticationRequest(pkt []byte) (variable []byte, adata []byte, err 
 	return
 }
 
-func SerializeAuthenticationRequest(variable []byte, adata []byte) ([]byte, error) {
+func SerializeAuthenticationRequest(phase int, variable []byte, adata []byte) ([]byte, error) {
 	var buf bytes.Buffer
+	if _, err := buf.Write([]byte{byte(phase)}); err != nil {
+		return nil, err
+	}
 	if err := WriteChunk(&buf, variable); err != nil {
 		return nil, err
 	}

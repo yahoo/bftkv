@@ -1,36 +1,36 @@
 \section{Security Analysis for $\mathcal{TPA}$}
 \label{tpa}
 \subsection{Correctness}
-Assume $\{Y_i\}_{\{i \in \mathcal{T}\}}$ is correctly calculated,
+Assume each $\{Y_i\}_{\{i \in \mathcal{T}\}}$ is correctly calculated,
 $G_S$ will be:
 \[
   G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = g_{\pi}^{a \sum_{j
-      \in \mathcal{T}} f(j) \lambda_j} = (g_{\pi}^S)^a \bmod p
+      \in \mathcal{T}} f(j) \lambda_j} = g_{\pi}^{aS} \bmod p
 \]
 and by raising $s_i = g_{\pi}^{h(ID_i)} \bmod p$ to $G_S$, we get:
 \[
-  X_i = G_S^{s_i} = (g_{\pi}^{Ssi})^{aa'} \bmod p
+  X_i = (G_S^{s_i})^{a'} = (g_{\pi}^{Ss_i})^{aa'} \bmod p
 \]
-which must be the same as $v_i^{aa'} \bmod p$ for each $i \in
+which must be the same as $v_i^{a} \bmod p$ for each $i \in
 \mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
 step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
 share DH keys $K_i = g_{\pi}^{Ss_iaa'b_i} \bmod p$.
 
 \begin{lemma}
 \label{tpa1}
-From $\{Y_i\}_{i \in \mathcal{L}}$ where $L \subset \{1..n\}$ and $|L| <
+From $\{Y_i\}_{i \in \mathcal{L}}$ where $\mathcal{L} \subset \{1..n\}$ and $|\mathcal{L}| <
 t$, correct $G_S$ cannot be obtained.
 \end{lemma}
 
 \begin{proof}
-$S$ cannot be reconstructed from $|L|$ servers, from the SSS
+$S$ cannot be reconstructed from $|\mathcal{L}|$ servers, from the SSS
   property, thus $g_{\pi}^S$ cannot be obtained.
 \end{proof}
 
 \subsection{Protocol Analysis}
 We look into the protocols by dividing it into two parts: the first
-roundtrip (process 1 and 2) is to recover the shared secret $S$, and
-the second roundtrip (process 3 and 4) is for key exchange.
+roundtrip (step 1 and 2) is to recover the shared secret $S$, and
+the second roundtrip (step 3 and 4) is for key exchange.
 
 $g_{\pi} = \pi^2 \bmod p$, where $\pi$ is a secure hash value over the
 password, is a safe generator in $\mathbb{Z}^*_p$ with high
@@ -53,7 +53,7 @@ from a made up DH term. Thus the client has no choice but to calculate
 $B_i^a \bmod p$ to obtain $K_i$.
 
 \subsection{Resistance to MiTM}
-Assume we have $\mathcal{L} < t$ compromised servers and try to
+Assume we have $|\mathcal{L}| < t$ compromised servers and try to
 reconstruct $g_{\pi}^S \bmod p$ from ${y_i}$. From the Lemma
 ~\ref{tpa1} we need at least one $Y_i$, $i \notin \mathcal{L}$, and
 unless the server $i$ is not compromised the only way to get $Y_i$ is
@@ -78,10 +78,10 @@ the step 2, and $Z_i = E_{h(K_i)}(Pi, X_i||Y_i)$ from the step
 $v_i$.
 To brute force on $v_i$ there are two possible ways:
 \begin{enumerate}
-\item $\exists S \in \mathbb{Z}_q$ check if
+\item $\exists S \in \mathbb{Z}_q$, check if
   $v_i \stackrel{\text{\tiny ?}}{=} (g_{\pi}^{s_i})^S \bmod p$
   for each $g_{\pi}^{s_i}$ \\
-\item $\exists g_{\pi} \in \mathbb{Z}^*_q$ check if
+\item $\exists g_{\pi} \in \mathbb{Z}^*_q$, check if
   $v_i \stackrel{\text{\tiny ?}}{=} (g_{\pi}^S)^{s_i} \bmod p$
   for each $s_i$
 \end{enumerate}
@@ -91,6 +91,9 @@ for $\forall g \in \mathbb{Z}$ or $g_{\pi}^{aS} \bmod p$. Obtaining
 $S$ is simply the {\sf DLOG} problem. $g_{\pi}^S \bmod p$ can be
 obtained iff $g$ happens to be $g_{\pi}$ or a legitimate client
 chooses $a = 1$ which must be excluded.
-
-$g^e = \pi^2$, we cannot calculate $e$ from $\pi^2$. To brute force on
-$e$, we get $P_i = P_r[g^i \in Dict]$.
+If $g_{\pi}^S$ is obtained, the dictionary attack is possible on
+$s_i$, however, it is difficult to obtain $g_{\pi}^S$ from $G_S$ which
+is calcualted by a legitimate client as $a$ has been randomly
+chosen. Attackers can choose $a = 1$ at the step 1 and they can obtain
+$g_{\pi'}^S$ but they need to start over the protocol to get the
+correct $g_{\pi}^S$.

@@ -11,46 +11,52 @@ import (
 	"fmt"
 )
 
-func testAuth(t *testing.T, password []byte, plainData []byte) {
-	k := 4
+func testAuth(t *testing.T, password []byte, proof []byte) {
+	k := 7
 	n := 10
-	auth := New()
 
-	ss, err := auth.GeneratePartialAuthenticationParams(password, n, k)
+	ss, err := GeneratePartialAuthenticationParams(password, n, k)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	c := auth.NewClient(password, n, k)
+	c := NewClient(password, n, k)
 
-	challenge, err := c.GenerateAuthenticationData()
+	X, err := c.GenerateX()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	finished := false
+	var Xis map[uint64][]byte
 	for i := 0; i < n; i++ {
-		res, err := auth.MakeResponse(ss[i], challenge, plainData)
+		Yi, err := MakeYi(ss[i], X)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		finished, err = c.ProcessAuthResponse(res, uint64(i))
+		Xis, err = c.ProcessYi(Yi, uint64(i))
 		if err != nil {
 			t.Fatal(err)
 		}
+		if Xis != nil {
+			break
+		}
 	}
-	if !finished {
+	if Xis == nil {
 		t.Error("not enough responses")
 		return
 	}
 
-	for i := 0; i < n; i++ {
-		plain, err := c.GetAuxData(uint64(i))
+	for id, Xi := range Xis {
+		Bi, err := MakeBi(ss[id], Xi, proof)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.Equal(plain, plainData) {
+		Pi, err := c.ProcessBi(Bi, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(Pi, proof) {
 			t.Error("decryption failed")
 		}
 	}

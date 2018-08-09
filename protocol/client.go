@@ -55,7 +55,6 @@ func NewClient(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Transpor
 		qs: qs,
 		tr: tr,
 		crypt: crypt,
-		auth: auth.New(),
 		threshold: threshold.New(crypt),
 	}}
 }
@@ -139,12 +138,12 @@ func (c *Client) collectSignatures(variable []byte, value []byte, t uint64, proo
 	}
 
 	// collect sigantures from the quorum
-	qa := c.qs.ChooseQuorum(quorum.AUTH)
+	qa := c.qs.ChooseQuorum(quorum.AUTH | quorum.PEER)
 	pkt, err := packet.Serialize(variable, value, t, sig, proof)
 	var failure []node.Node
 	var errs []error
 	ss = new(packet.SignaturePacket)
-	c.tr.Multicast(transport.Sign, c.PeerNodes(qa.Nodes()), pkt, func(res *transport.MulticastResponse) bool {
+	c.tr.Multicast(transport.Sign, qa.Nodes(), pkt, func(res *transport.MulticastResponse) bool {
 		err := res.Err
 		if err == nil {
 			if res.Data != nil {
@@ -359,68 +358,88 @@ func (c *Client) doRevoke(tbr node.Node, revoked []uint64, node_type string) []u
 //
 
 func (c *Client) Authenticate(variable []byte, cred []byte) (proof *packet.SignaturePacket, key []byte, err error) {
-	q := c.qs.ChooseQuorum(quorum.AUTH)
-	auth := c.auth.NewClient(cred, len(q.Nodes()), q.GetThreshold())
-	proof, err = c.doAuthentication(auth, variable, q)
+	q := c.qs.ChooseQuorum(quorum.AUTH | quorum.PEER)
+	aclient := auth.NewClient(cred, len(q.Nodes()), q.GetThreshold())
+	proof, err = c.doAuthentication(aclient, variable, q)
 	if err == crypto.ErrNoAuthenticationData {
 		// need to register first
 		if err := c.setupAuthenticationParameters(variable, cred, q); err != nil {
 			return nil, nil, err
 		}
-		proof, err = c.doAuthentication(auth, variable, q)
+		proof, err = c.doAuthentication(aclient, variable, q)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 	if err == nil {
-		key, err = auth.GetCipherKey()
+		key, err = aclient.GetCipherKey()
 	}
 	return proof, key, err
 }
 
-func (c *Client) doAuthentication(auth crypto.AuthenticationClient, variable []byte, q quorum.Quorum) (*packet.SignaturePacket, error) {
-	adata, err := auth.GenerateAuthenticationData()
+func (c *Client) doAuthentication(aclient crypto.AuthenticationClient, variable []byte, q quorum.Quorum) (*packet.SignaturePacket, error) {
+	// phase 1 
+	X, err := aclient.GenerateX()
 	if err != nil {
 		return nil, err
 	}
-	pkt, err := packet.SerializeAuthenticationRequest(variable, adata)
+	pkt, err := packet.SerializeAuthenticationRequest(0, variable, X)
 	if err != nil {
 		return nil, err
 	}
 	var succ, failure []node.Node
 	var errs []error
-	authenticated := false
-	c.tr.Multicast(transport.Auth, c.PeerNodes(q.Nodes()), pkt, func(res *transport.MulticastResponse) bool {
-		err := res.Err
-		if err == nil {
-			authenticated, err = auth.ProcessAuthResponse(res.Data, res.Peer.Id())
-		}
-		if err == nil {
-			succ = append(succ, res.Peer)
-		} else {
-			errs = append(errs, err)
+	var Xis map[uint64][]byte
+	c.tr.Multicast(transport.Auth, q.Nodes(), pkt, func(res *transport.MulticastResponse) bool {
+		if res.Err != nil {
+			errs = append(errs, res.Err)
 			failure = append(failure, res.Peer)
 			return q.Reject(failure)
 		}
-		return false	// collect auth responses as many as possible
+		Xis, err = aclient.ProcessYi(res.Data, res.Peer.Id())
+		if err != nil {	// fatal
+			errs = []error{err}
+			return true
+		}
+		succ = append(succ, res.Peer)
+		return Xis != nil
 	})
-	if !authenticated {
+	if Xis == nil {
 		return nil, majorityError(errs, crypto.ErrInsufficientNumberOfSecrets)
 	}
-	// decrypt the all collected aux data and marge them into a collective signature
+
+	// phase 2
+	mpkt := make([][]byte, len(succ))
+	for i, peer := range succ {
+		Xi, ok := Xis[peer.Id()]
+		if !ok {
+			continue	// should not happen...
+		}
+		pkt, err := packet.SerializeAuthenticationRequest(1, variable, Xi)
+		if err != nil {
+			return nil, err
+		}
+		mpkt[i] = pkt
+	}
 	var ss packet.SignaturePacket
 	suff := false
-	for _, id := range succ {
-		aux, err := auth.GetAuxData(id.Id())
-		if err == nil {
-			sig, err := packet.ParseSignature(aux)
-			if err == nil {
-				suff = c.crypt.CollectiveSignature.Combine(&ss, sig, q)
+	cnt := 0
+	c.tr.MulticastM(transport.Auth, succ, mpkt, func(res *transport.MulticastResponse) bool {
+		if res.Err == nil {
+			if proof, err := aclient.ProcessBi(res.Data, res.Peer.Id()); err == nil {
+				if sig, err := packet.ParseSignature(proof); err == nil {
+					suff = c.crypt.CollectiveSignature.Combine(&ss, sig, q)
+					cnt++
+					if suff {
+						return true
+					}
+				}
 			}
 		}
-	}
+		return false	// continue regardless of errors
+	})
 	if !suff {
-		return nil, crypto.ErrInsufficientNumberOfSecrets
+		return nil, crypto.ErrInsufficientNumberOfSignatures
 	}
 	return &ss, err
 }
@@ -437,23 +456,25 @@ func (c *Client) setupAuthenticationParameters(variable []byte, cred []byte, q q
 	}
 
 	// send out auth params to each member of the quorum
-	params, err := c.auth.GeneratePartialAuthenticationParams(cred, len(q.Nodes()), q.GetThreshold())
+	params, err := auth.GeneratePartialAuthenticationParams(cred, len(q.Nodes()), q.GetThreshold())
 	if err != nil {
 		return err
 	}
-	var succ []node.Node
-	for i, peer := range q.Nodes() {
-		pkt, err := packet.Serialize(variable, nil, uint64(0), sig, nil, params[i])
+	mpkt := make([][]byte, len(params))
+	for i, param := range params {
+		pkt, err := packet.Serialize(variable, nil, uint64(0), sig, nil, param)
 		if err != nil {
 			return err
 		}
-		c.tr.Multicast(transport.SetAuth, []node.Node{peer}, pkt, func(res *transport.MulticastResponse) bool {
-			if res.Err == nil {
-				succ = append(succ, peer)
-			}
-			return true
-		})
+		mpkt[i] = pkt
 	}
+	var succ []node.Node
+	c.tr.MulticastM(transport.SetAuth, q.Nodes(), mpkt, func(res *transport.MulticastResponse) bool {
+		if res.Err == nil {
+			succ = append(succ, res.Peer)
+		}
+		return false	// broadcast as many as possible
+	})
 	if !q.IsSufficient(succ) {
 		return bftkv.ErrInsufficientNumberOfValidResponses
 	}
@@ -472,20 +493,22 @@ func (c *Client) Distribute(caname string, key interface{}) error {
 	if err != nil {
 		return err
 	}
-	succ := 0
-	for i, peer := range q.Nodes() {
-		val := threshold.SerializeParams(algo, secrets[i])
+	mpkt := make([][]byte, len(secrets))
+	for i, secret := range secrets {
+		val := threshold.SerializeParams(algo, secret)
 		pkt, err := packet.Serialize([]byte(caname), val)		// do we need to sign?
 		if err != nil {
 			return err
 		}
-		c.tr.Multicast(transport.Distribute, []node.Node{peer}, pkt, func(res *transport.MulticastResponse) bool {
-			if res.Err == nil {
-				succ++
-			}
-			return false
-		})
+		mpkt[i] = pkt
 	}
+	succ := 0
+	c.tr.MulticastM(transport.Distribute, q.Nodes(), mpkt, func(res *transport.MulticastResponse) bool {
+		if res.Err == nil {
+			succ++
+		}
+		return false
+	})
 	if succ < k {
 		return bftkv.ErrInsufficientNumberOfResponses
 	}

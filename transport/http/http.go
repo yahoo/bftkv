@@ -70,7 +70,11 @@ func (h *TrHTTP) Post(addr string, msg io.Reader) (io.ReadCloser, error) {
 }
 
 func (h *TrHTTP) Multicast(path int, peers []node.Node, data []byte, cb func(res *transport.MulticastResponse) bool) {
-	transport.Multicast(h, path, peers, data, cb)
+	transport.Multicast(h, path, peers, [][]byte{data}, cb)
+}
+
+func (h *TrHTTP) MulticastM(path int, peers []node.Node, mdata [][]byte, cb func(res *transport.MulticastResponse) bool) {
+	transport.Multicast(h, path, peers, mdata, cb)
 }
 
 func (h *TrHTTP) Start(o transport.TransportServer, addr string) {

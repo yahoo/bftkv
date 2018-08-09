@@ -15,7 +15,6 @@ type Protocol struct {
 	qs quorum.QuorumSystem
 	tr transport.Transport
 	crypt *crypto.Crypto
-	auth crypto.Authentication
 	threshold crypto.Threshold
 }
 
@@ -36,7 +35,7 @@ func (p *Protocol) Joining() error {
 		if len(peers) == 0 {
 			break
 		}
-		p.tr.Multicast(transport.Join, p.PeerNodes(peers), pkt, func(res *transport.MulticastResponse) bool {
+		p.tr.Multicast(transport.Join, peers, pkt, func(res *transport.MulticastResponse) bool {
 			if res.Data != nil {	// ignore res.Err as it might be bacause the peer certificate hasn't been registered yet
 				nodes, err := p.crypt.Certificate.Parse(res.Data)
 				if err == nil {
@@ -55,17 +54,7 @@ func (p *Protocol) Joining() error {
 func (p *Protocol) Leaving() error {
 	pkt, err := p.self.SerializeSelf()
 	if err == nil {
-		p.tr.Multicast(transport.Leave, p.PeerNodes(p.self.GetPeers()), pkt, nil)
+		p.tr.Multicast(transport.Leave, p.self.GetPeers(), pkt, nil)
 	}
 	return err
-}
-
-func (p *Protocol) PeerNodes(nodes []node.Node) []node.Node {
-	var peers []node.Node
-	for _, n := range nodes {
-		if n.Id() != p.self.Id() {
-			peers = append(peers, n)
-		}
-	}
-	return peers
 }

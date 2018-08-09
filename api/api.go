@@ -112,10 +112,10 @@ func (api *API) Register(certs []string, password string) error {
 	if err != nil {
 		return err
 	}
-	q := api.qs.ChooseQuorum(quorum.AUTH)
+	q := api.qs.ChooseQuorum(quorum.AUTH | quorum.PEER)
 	var sigs []node.Node
 	var succ []node.Node
-	api.tr.Multicast(transport.Register, api.client.PeerNodes(q.Nodes()), pkt, func(res *transport.MulticastResponse) bool {
+	api.tr.Multicast(transport.Register, q.Nodes(), pkt, func(res *transport.MulticastResponse) bool {
 		if res.Err == nil {
 			certs, err := api.crypt.Certificate.Parse(res.Data)
 			if err == nil {

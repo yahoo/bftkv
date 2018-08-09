@@ -53,6 +53,7 @@ type TransportServer interface {
 
 type Transport interface {
 	Multicast(path int, peers []node.Node, data []byte, cb func(res *MulticastResponse) bool)
+	MulticastM(path int, peers []node.Node, mdata [][]byte, cb func(res *MulticastResponse) bool)
 	Start(o TransportServer, addr string)
 	Stop()
 
@@ -63,7 +64,7 @@ type Transport interface {
 	Decrypt(r io.Reader) (plain []byte, nonce []byte, peer node.Node, err error)
 }
 
-func Multicast(tr Transport, path int, peers []node.Node, data []byte, cb func(res *MulticastResponse) bool) {
+func Multicast(tr Transport, path int, peers []node.Node, mdata [][]byte, cb func(res *MulticastResponse) bool) {
 	cmd := ""
 	switch path {
 	case Join:
@@ -94,21 +95,19 @@ func Multicast(tr Transport, path int, peers []node.Node, data []byte, cb func(r
 		cmd = "notify"
 	}
 	ch := make(chan(*MulticastResponse), len(peers))
-	t1 := tr.GenerateRandom()
-	cipher, err := tr.Encrypt(peers, data, t1)
-	if err != nil {
-		if cb == nil {
-			return
-		}
-		for _, peer := range peers {
-			if cb(&MulticastResponse{peer, nil, err}) {
-				break
+	var cipher []byte
+	var nonce []byte
+	var err error
+	for i, peer := range(peers) {
+		if i < len(mdata) {
+			nonce = tr.GenerateRandom()
+			cipher, err = tr.Encrypt(peers[i : i+len(peers)-len(mdata)+1], mdata[i], nonce)
+			if err != nil {
+				ch <- &MulticastResponse{peer, nil, err}
+				continue
 			}
 		}
-		return
-	}
-	for _, peer := range(peers) {
-		go func(peer node.Node) {
+		go func(peer node.Node, cipher []byte, nonce []byte) {
 			if peer.Address() == "" {
 				ch <- &MulticastResponse{peer, nil, ErrNoAddress}
 				return
@@ -116,16 +115,16 @@ func Multicast(tr Transport, path int, peers []node.Node, data []byte, cb func(r
 			var plain []byte
 			r, err := tr.Post(peer.Address() + Prefix + cmd, bytes.NewReader(cipher))
 			if err == nil {
-				var t2 []byte
-				plain, t2, _, err = tr.Decrypt(r)
+				var t []byte
+				plain, t, _, err = tr.Decrypt(r)
 				r.Close()
-				if err == nil && !bytes.Equal(t1, t2) {
+				if err == nil && !bytes.Equal(t, nonce) {
 					err = ErrTransportNonceMismatch
 					plain = nil
 				}
 			}
 			ch <- &MulticastResponse{peer, plain, err}	// Node is always available
-		}(peer)
+		}(peer, cipher, nonce)
 	}
 	for i := 0; i < len(peers); i++ {
 		mr := <- ch

@@ -70,16 +70,10 @@ type CollectiveSignature interface {
 }
 
 type AuthenticationClient interface {
-	GenerateAuthenticationData() ([]byte, error)
-	ProcessAuthResponse(res []byte, id uint64) (bool, error)
-	GetAuxData(id uint64) ([]byte, error)
+	GenerateX() ([]byte, error)
+	ProcessYi(res []byte, id uint64) (map[uint64][]byte, error)
+	ProcessBi(res []byte, id uint64) ([]byte, error)
 	GetCipherKey() ([]byte, error)
-}
-
-type Authentication interface {
-	GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error)
-	MakeResponse(ss []byte, challenge []byte, plain []byte) (res []byte, err error)
-	NewClient(cred []byte, n, k int) AuthenticationClient
 }
 
 type DataEncryption interface {

@@ -33,13 +33,24 @@ func New(g *graph.Graph) quorum.QuorumSystem {
 	return &wot{g: g}
 }
 
-func newQC(clique graph.Clique, rw int) *qc {
-	n := len(clique.Nodes)
+func (qs *wot) newQC(clique graph.Clique, rw int) *qc {
+	var nodes []node.Node
+	if (rw & quorum.PEER) != 0 {	// exclude the self node
+		self := qs.g.GetSelfId()
+		for _, n := range clique.Nodes {
+			if n.Id() != self {
+				nodes = append(nodes, n)
+			}
+		}
+	} else {
+		nodes = clique.Nodes
+	}
+	n := len(nodes)
 	if n == 0 {
 		return nil
 	}
 	if rw == quorum.WRITE {
-		return &qc{clique.Nodes, 0, 0, 0, 0}
+		return &qc{nodes, 0, 0, 0, 0}
 	}
 	f := (n - 1) / 3
 	if f >= 1 {
@@ -52,13 +63,13 @@ func newQC(clique graph.Clique, rw int) *qc {
 		if clique.Weight <= n - suff {
 			suff = 0
 		}
-		return &qc{clique.Nodes, f, min, threshold, suff}
+		return &qc{nodes, f, min, threshold, suff}
 	} else {
 		return nil
 	}
 }
 
-func complement(u []node.Node, c []qc, e []qc, rw int) []qc {
+func (qs *wot) complement(u []node.Node, c []qc, e []qc, rw int) []qc {
 	var nodes []node.Node
 	for _, n1 := range u {
 		found := false
@@ -75,7 +86,7 @@ func complement(u []node.Node, c []qc, e []qc, rw int) []qc {
 			nodes = append(nodes, n1)
 		}
 	}
-	if q := newQC(graph.Clique{nodes, 0}, rw); q != nil {
+	if q := qs.newQC(graph.Clique{nodes, 0}, rw); q != nil {
 		e = append(e, *q)
 	}
 	return e
@@ -85,7 +96,7 @@ func (qs *wot) getQuorumFrom(rw int, s uint64, distance int) *wotq {
 	q := &wotq{}
 	cliques := qs.g.GetCliques(s, distance)
 	for _, c := range cliques {
-		if qc := newQC(c, rw | quorum.AUTH); qc != nil {
+		if qc := qs.newQC(c, rw | quorum.AUTH); qc != nil {
 			q.qcs = append(q.qcs, *qc)
 		}
 	}
@@ -94,9 +105,9 @@ func (qs *wot) getQuorumFrom(rw int, s uint64, distance int) *wotq {
 		if (rw & quorum.AUTH) == 0 {
 			qcs = nil
 		}
-		qcs = complement(qs.g.GetReachableNodes(s, distance), q.qcs, qcs, quorum.READ)	// R = {Vi} - {Ci}
+		qcs = qs.complement(qs.g.GetReachableNodes(s, distance), q.qcs, qcs, quorum.READ)	// R = {Vi} - {Ci}
 		if (rw & quorum.WRITE) != 0 {
-			qcs = complement(qs.g.GetPeers(), append(q.qcs, qcs...), qcs, quorum.WRITE)	// W = U - {Ci} + R
+			qcs = qs.complement(qs.g.GetPeers(), append(q.qcs, qcs...), qcs, quorum.WRITE)	// W = U - {Ci} + R
 		}
 		q.qcs = qcs
 	}

@@ -113,6 +113,11 @@ func testRegistration(t *testing.T, clientKey string) {
 	if err := client.UpdateCert(); err != nil {	// update the pubring
 		t.Error(err)
 	}
+
+	// double-check if the password auth went through
+	if _, _, err := client.client.Authenticate([]byte(client.UId()), []byte(password)); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestAPI(t *testing.T) {

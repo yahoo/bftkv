@@ -49,7 +49,6 @@ func NewServer(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Transpor
 			qs: qs,
 			tr: tr,
 			crypt: crypt,
-			auth: auth.New(),
 			threshold: threshold.New(crypt),
 		},
 		st: st,
@@ -166,12 +165,12 @@ func (s *Server) read(req []byte, peer node.Node) ([]byte, error) {
 	if err != nil && err != storage.ErrNotFound {
 		return nil, err
 	}
-	var auth []byte
+	var authenticated []byte
 	if tvs != nil {
 		var ss *packet.SignaturePacket
 		var t uint64
 		// check to see if tvs has ss, which means the write process has completed
-		_, _, t, _, ss, auth, err = packet.Parse(tvs)
+		_, _, t, _, ss, authenticated, err = packet.Parse(tvs)
 		if err != nil {
 			return nil, err
 		}
@@ -190,7 +189,7 @@ func (s *Server) read(req []byte, peer node.Node) ([]byte, error) {
 			}
 		}
 	}
-	if auth != nil {
+	if authenticated != nil {
 		if proof == nil || s.crypt.CollectiveSignature.Verify(variable, proof, s.qs.ChooseQuorum(quorum.AUTH)) != nil {
 			return nil, bftkv.ErrAuthenticationFailure
 		}
@@ -235,7 +234,7 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 		rdata = nil
 	}
 
-	var auth []byte
+	var proof []byte
 	if rdata != nil {
 		// the variable already exists
 		_, rval, rt, rsig, _, rauth, err := packet.Parse(rdata)
@@ -269,7 +268,7 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 		} else if t < rt {
 			return nil, bftkv.ErrBadTimestamp
 		}
-		auth = rauth	// inherit the auth params
+		proof = rauth	// inherit the auth params
 	}
 
 	// now sign the request
@@ -288,7 +287,7 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 	}
 
 	// save the request packet to the storage before returning the signature
-	req, err = packet.Serialize(variable, val, t, sig, nil, auth)	// get rid of ss to tell it's not completed
+	req, err = packet.Serialize(variable, val, t, sig, nil, proof)	// get rid of ss to tell it's not completed
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +418,7 @@ func (s *Server) setAuth(req []byte, peer node.Node) ([]byte, error) {
 }
 
 func (s *Server) authenticate(req []byte, peer node.Node) ([]byte, error) {
-	variable, authdata, err := packet.ParseAuthenticationRequest(req)
+	phase, variable, authdata, err := packet.ParseAuthenticationRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -434,17 +433,25 @@ func (s *Server) authenticate(req []byte, peer node.Node) ([]byte, error) {
 	if rauth == nil {
 		return nil, crypto.ErrNoAuthenticationData
 	}
-	ss, err := s.crypt.CollectiveSignature.Sign(variable)	// @@ signing over only variables which means you can keep the proof for the later use
-	if err != nil {
-		return nil, err
-	}
-	sig, err := packet.SerializeSignature(ss)
-	if err != nil {
-		return nil, err
-	}
-	res, err := s.auth.MakeResponse(rauth, authdata, sig)
-	if err != nil {
-		return nil, err
+	var res []byte
+	if phase == 0 {
+		res, err = auth.MakeYi(rauth, authdata)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		ss, err := s.crypt.CollectiveSignature.Sign(variable)	// @@ signing over only variables which means you can keep the proof for the later use
+		if err != nil {
+			return nil, err
+		}
+		sig, err := packet.SerializeSignature(ss)
+		if err != nil {
+			return nil, err
+		}
+		res, err = auth.MakeBi(rauth, authdata, sig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// check and save the auth history
@@ -458,7 +465,7 @@ func (s *Server) authenticate(req []byte, peer node.Node) ([]byte, error) {
 			log.Printf("server[%s]: auth: too many retry from %s on %v\n", s.self.Name(), peer.Name(), variable)
 		}
 	} else {
-		hist = &AuthHistory{time.Now(), 1}
+		hist = &AuthHistory{time.Now(), 0}	// should be #phases - 2
 	}
 	s.writeAuthHistory(variable, hist)
 

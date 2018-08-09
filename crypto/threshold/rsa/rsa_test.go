@@ -296,7 +296,7 @@ func doTest(t *testing.T, n, k int, key interface{}) {
 }
 
 func doProcess(ctx crypto.Threshold, n, k int, params [][]byte, retry int, isFault func(i, n int) bool) ([]byte, error) {
-	proc, err := ctx.NewProcess([]byte(testTBS), gocrypto.SHA256)
+	proc, err := ctx.NewProcess([]byte(testTBS), crypto.TH_RSA, gocrypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +339,7 @@ func doProcess(ctx crypto.Threshold, n, k int, params [][]byte, retry int, isFau
 				}
 				fmt.Printf("}\n")
 			}
-			sig, err := proc.ProcessResponse(res, nodes[i])
+			sig, err := proc.ProcessResponse(res, nodes[j])
 			if err != nil {
 				return nil, err
 			}
