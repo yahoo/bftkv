@@ -158,18 +158,19 @@ for $(t, n)$ SSS over a prime field $\mathbb{Z}_q$, s.t.,
   f(x) = \sum_{i=0}^{t-1}a_ix^i \bmod q
 \]
 then calculates $n=|Q|$ pairs $(i,f(i)), i = 1..n$. The shared secret
-is $S = f(0)$. Each {\em share} will be $\langle i, y_i, v_i \rangle$,
+is $S = f(0)$. Each {\em share} will be $\langle i, y_i, v_i, t_i
+\rangle$,
 where:
 \begin{align*}
   y_i &= f(i) \\
   v_i &= g_{\pi}^{Ss_i} \bmod p \\
-  s_i &= g_{\pi}^{h(ID_i)} \bmod p \\
+  s_i &= \text{OS2I}(h(password, t_i)) \\
   g_{\pi} &= \pi^2 \bmod p \\
   \pi &= \text{OS2I}(h(password))
 \end{align*}
 $p$ and $q$ are prime numbers such that $p = 2q + 1$ (i.e., $p$ is a
-safe prime). The random polynomial must be generated randomly for each
-password.\\
+safe prime). $t_i$ is a salt. The random polynomial must be generated
+randomly for each password.\\
 
 To get a password authenticated:
 \begin{enumerate}
@@ -183,8 +184,9 @@ To get a password authenticated:
 
 \item Each quorum member returns:
   \[
-    Y_i = X^{y_i} \bmod p.
+    Y_i = X^{y_i} \bmod p
   \]
+  with the salt $t_i$.
 
 \item The client collects $t$ responses from the quorum ($\mathcal{T}
   \subseteq Q$), and
@@ -205,7 +207,7 @@ To get a password authenticated:
   \]
   where
   \[
-    s_i = g_{\pi}^{h(ID_i)} \bmod p.
+    s_i = h(password, t_i)
   \]
 
 \item Each quorum member($\in \mathcal{T}$) generates a random exponent
@@ -247,9 +249,9 @@ $G_S$ will be:
   G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = g_{\pi}^{a \sum_{j
       \in \mathcal{T}} f(j) \lambda_j} = (g_{\pi}^S)^a \bmod p
 \]
-and by raising $s_i = g_{\pi}^{h(ID_i)} \bmod p$ to $G_S$, we get:
+and by raising $s_i = h(password, s_i)$ to $G_S$, we get:
 \[
-  X_i = G_S^{s_i} = (g_{\pi}^{Ssi})^a \bmod p
+  X_i = G_S^{s_i} = (g_{\pi}^{Ss_i})^a \bmod p
 \]
 which must be the same as $v_i^a \bmod p$ for each $i \in
 \mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the

@@ -90,7 +90,7 @@ func GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error
 	}
 
 	// g_pi = pi^2 mod p
-	pi := PI(cred, nil)
+	pi := PI(cred)
 
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
@@ -104,7 +104,7 @@ func GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error
 		params.x = c.X
 		params.y = c.Y
 		params.salt = hash(salt, []byte{byte(i)})
-		si := new(big.Int).SetBytes(hash(cred, params.salt))	// si = PI(pass, hash(salt, i))
+		si := new(big.Int).SetBytes(hash(cred, params.salt))	// si = hash(pass, hash(salt, i))
 		si.Mod(si.Mul(si, s), q)
 		params.v = new(big.Int).Exp(pi, si, p)	// vi = g_pi^(S*si)
 
@@ -177,7 +177,7 @@ func (c *AuthClient) GenerateX() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	X := new(big.Int).Exp(PI(c.password, nil), a, p)
+	X := new(big.Int).Exp(PI(c.password), a, p)
 	c.a = a
 	return X.Bytes(), nil
 }
@@ -259,9 +259,9 @@ func (c *AuthClient) calculateSharedSecret() *big.Int {
 	return gs
 }
 
-func PI(password, salt []byte) *big.Int {
+func PI(password []byte) *big.Int {
 	t := new(big.Int)
-	t.SetBytes(hash(password, salt))
+	t.SetBytes(hash(password))
 	return t.Mod(t.Mul(t, t), q)
 }
 
