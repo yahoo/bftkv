@@ -132,7 +132,7 @@ requested data.  See {\sf CheckTOFU} \ref{CheckTOFU} for the
 algorithm to check the TOFU policy.
 
 \subsection{Threshold Password Authentication ($\mathcal{TPA}$)}
-\label{threshold}
+\label{auth}
 The quorum system based on the WoT graph guarantees data
 integrity. The TOFU policy with the quorum certificate prevents
 unauthorized mutations. The collective signatures make it possible to
@@ -334,6 +334,7 @@ existing keys as-is and distributes it to multiple servers, which will
 make it easy to migrate from existing systems.
 
 \subsubsection*{RSA}
+\label{thrsa}
 It is straightforward to construct a $(n, n)$ ``threshold'' scheme with
 RSA \cite{garay,rabin}. Decompose the private key $d$ into $\{d_i\}_{i =
 1..n} \; \text{s.t., } d = \sum_{i=1}^{n} d_i \bmod \varphi(N)$, and the

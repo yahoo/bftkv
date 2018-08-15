@@ -53,7 +53,7 @@ schemes. Especially for the latter, the system uses a threshold
 siganture scheme introduced by Gennaro et al.\ \cite{Gennaro}. For the
 threshold password authentication, the system uses a simple DH key
 exchange protocol with a similar setting to \cite{ford}.
-See ~\ref{threshold} for the details.
+See ~\ref{auth} for the details.
 SSS uses a $t-1$ degree random polynomial on $\mathbb{Z}_q$
 \[
   f(x) = \sum_{i=0}^{t-1}a_ix^i \bmod q
@@ -85,7 +85,7 @@ solved this problem by getting rid of multiplicative inverse all
 together but it needs a special construction of the RSA parameters,
 which makes it difficult to apply existing keys to the
 method. Therefore we use a simple key hierachy to address this
-issue. See \ref{threshold} for the details.
+issue. See \ref{thrsa} for the details.
 
 For DSA and ECDSA, SSS has preferable properties due to its linearity:
 \begin{align*}

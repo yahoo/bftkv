@@ -6,26 +6,36 @@ extend the protocols with {\sf join/leave}. Also {\sf register}
 protocol is used to get quorum certificates with the threshold
 password authentication.
 
-\begin{quote}
-  {\em Notations}:
-  $\langle x, t, v, s_C, S \rangle$ is an ordered set that denotes the protocol
-  data. $s_C$ and $S$ can be omitted.
-  \begin{itemize}
-  \item[$x$] is the variable and an arbitrary length octet string. The variable will
-    be the key on the key-value store.
-  \item[$t$] is the timestamp and a 64-bit non-negative integer. $2^{64}-1$ is
-    a special value to denote that the variable is no longer able to be
-    updated.
-  \item[$v$] is the value and an arbitrary length octet string.
-  \item[$s_C$] is an object of the signature and quorum certificate of a
-    client $C$. $s_C.sig$ is the signature over $\langle x, t, v \rangle$ signed by the
-    private key of $C$. $s_C.cert$ is the quorum certificate of
-    $C$. $s_C.cert.ID$ is the unique ID to identify each node.
-  \item[$S$] is an unordered set of the signature object. Each $S_i
+{\em Notations}:
+$\langle x, t, v, s_C, S \rangle$ is an ordered set that denotes the protocol
+data. $s_C$ and $S$ can be omitted.
+
+\begin{tabular}{cl}
+  $x$ & \begin{minipage}[t]{0.8\columnwidth}%
+    is the variable and an arbitrary length octet
+    string. The variable will be the key on the key-value store.%
+  \end{minipage}\\
+  $t$ & \begin{minipage}[t]{0.8\columnwidth}%
+    is the timestamp and a 64-bit non-negative
+    integer. $2^{64}-1$ is a special value to denote that the variable is
+    no longer able to be updated.%
+  \end{minipage}\\
+  $v$ & \begin{minipage}[t]{0.8\columnwidth}%
+    is the value and an arbitrary length octet string.%
+  \end{minipage}\\
+  $s_C$ & \begin{minipage}[t]{0.8\columnwidth}%
+    is an object of the signature and quorum certificate
+    of a client $C$. $s_C.sig$ is the signature over $\langle x, t, v
+    \rangle$ signed by the private key of $C$. $s_C.cert$ is the quorum
+    certificate of $C$. $s_C.cert.ID$ is the unique ID to identify each
+    node.%
+  \end{minipage}\\
+  $S$ & \begin{minipage}[t]{0.8\columnwidth}%
+    is an unordered set of the signature object. Each $S_i
     \in S$ has the
-    same structure of the $s_C$. The signers must be quorum members.
-  \end{itemize}
-\end{quote}
+    same structure of the $s_C$. The signers must be quorum members.%
+  \end{minipage}\\
+\end{tabular}
 
 \subsection{Read / Write}
 \label{rw}
@@ -97,3 +107,29 @@ ID as one of the stored certificates it will sign it only if the
 password authentication is done. The client will get a ``proof'' of
 the authentication when it is finished.
 See algorithm {\sf Register} \ref{Register}
+
+\subsection{Authenticate}
+\label{authenticate}
+{\sf auth} protocol is done in advance of {\sf read / write /
+  register} to get a proof and each subsequence protocol verifies it
+before processing the request. The follwing diagram is for a quick
+review of $\mathcal{TPA}$ \ref{auth}.
+
+\begin{align*}
+  C &: \pi \leftarrow h(pw), \;
+      g_{\pi} \leftarrow \pi^2, \;
+      a \xleftarrow{\mathcal{R}} \mathbb{Z}_q \\
+  C \rightarrow Q &: X := g_{\pi}^a \bmod p \\
+  C \leftarrow Q_i &: Y_i := X^{y_i} \bmod p, t_i \\
+  C &: G_S \leftarrow \textstyle \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} \bmod p, \\
+    & \; s_i \leftarrow h(pw, t_i), \;
+      a' \xleftarrow{\mathcal{R}} \mathbb{Z}_q \\
+  C \rightarrow Q_i &: X_i := G_S^{s_ia'} \bmod p \\
+  Q_i &: K_i \leftarrow X_i^{b_i} \bmod p, \;
+        b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q \\
+  C \leftarrow Q_i &: B_i := v_i^{b_i} \bmod p,
+                     Z_i := E_{K_i}(P_i, \dots) 
+\end{align*}
+
+At the end of the protocol, $C$ obtains the proof $P = \{P_i\}_{i \in
+  \mathcal{T}}$.

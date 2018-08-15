@@ -5,11 +5,11 @@ Assume each $\{Y_i\}_{\{i \in \mathcal{T}\}}$ is correctly calculated,
 $G_S$ will be:
 \[
   G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = g_{\pi}^{a \sum_{j
-      \in \mathcal{T}} f(j) \lambda_j} = g_{\pi}^{aS} \bmod p
+      \in \mathcal{T}} f(j) \lambda_j} = g_{\pi}^{aS} \pmod p
 \]
 and by raising $s_i = h(password, t_i)$ to $G_S$, we get:
 \[
-  X_i = (G_S^{s_i})^{a'} = (g_{\pi}^{Ss_i})^{aa'} \bmod p
+  X_i = (G_S^{s_i})^{a'} = (g_{\pi}^{Ss_i})^{aa'} \pmod p
 \]
 which must be the same as $v_i^{a} \bmod p$ for each $i \in
 \mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
@@ -33,24 +33,15 @@ roundtrip (step 1 and 2) is to recover the shared secret $S$, and
 the second roundtrip (step 3 and 4) is for key exchange.
 
 $g_{\pi} = \pi^2 \bmod p$, where $\pi$ is a secure hash value over the
-password, is a safe generator in $\mathbb{Z}^*_p$ with high
+password, is a safe generator in $\mathbb{Z}^*_q$ with high
 probability. Raise a random exponent $a$ to mask the generator at the
 step 1. 
 
-Since $g_{\pi}^{Ss_i}$ is a generator with high probability,
-$(g_{\pi}^{Ss_i})^{ab_i} \bmod p$ can be seen as the traditional DH
-key, and cannot be distinguished from a random field element under the
-DDH assumption \cite{boneh}.
-
-From the correctness lemma, the client correctly obtains
-$g_{\pi}^S$ from $t$ servers. Also since it knows the password it can
-calculate $g_{\pi}^{h(ID)}$. With the random DH exponent $a$ it can
-calculate $g_{\pi}^Ss_ia \bmod p$. At each server $g_{\pi}^{Ss_i}
-\bmod p$ is pre-calculated. To obtain $b_i$ from $B_i =
-g_{\pi}^{Ss_ib_i} \bmod p$ the client needs to calculate discrete log
-on $B_i$. Unless the client can obtain $b_i$ it cannot calculate $K_i$
-from a made up DH term. Thus the client has no choice but to calculate
-$B_i^a \bmod p$ to obtain $K_i$.
+The second roundtrip can be seen as the traditional $DH$ with the
+generator $G_S^{s_i}$ where $s_i := h(pw, t_i)$. $t_i$ is a salt
+generated uniquely for each server. Another random exponent $a'$ is
+applied for making it difficult to do offline dictionary attacks over
+$s_i$.
 
 \subsection{Resistance to MiTM}
 Assume we have $|\mathcal{L}| < t$ compromised servers and try to
@@ -60,8 +51,8 @@ unless the server $i$ is not compromised the only way to get $Y_i$ is
 to issue the protocol $X = g_{\pi}^a \bmod p$. Unless the attacker
 knows $\pi$ all he can do is to guess the password and to keep asking
 the server to calculate $Y_i = g_{\pi'}^a \bmod p$ for $\pi'$. If the
-guess is wrong $Y'_i$ will not calculate $g_{\pi}^S$ with the
-compromised data $\{f(j)\}_{j \in \mathcal{L}}$.
+guess is wrong $Y'_i$ will not calculate $g_{\pi}^S$ correctly with
+the compromised data $\{f(j)\}_{j \in \mathcal{L}}$.
 Unless the attacker can calculate $S$ from $g^S \bmod p$ with a
 fabricated $g$, he cannot calculate $g_{\pi'}^S \bmod p$ in
 order to brute force for $g_{\pi'} \notin \{g^e | e = 1..p-1\}$.
@@ -74,21 +65,21 @@ Under the same condition of MiTM, what the client can obtain is:
 \end{align*}
 for $i \in \mathcal{L}$. We also get $G_S = g_{\pi}^{aS} \bmod p$ from
 the step 2, and $Z_i = E_{h(K_i)}(Pi, X_i||Y_i)$ from the step
-4. $B_i$ will not contribute anything the attack as we already have
-$v_i$.
+4. $B_i$ will not contribute anything to the attack as they already
+have $v_i$.
 To brute force on $v_i$ there are two possible ways:
 \begin{enumerate}
 \item $\exists S \in \mathbb{Z}_q$, check if
-  $v_i \stackrel{\text{\tiny ?}}{=} (g_{\pi}^{s_i})^S \bmod p$
+  $v_i \stackrel{\text{\tiny ?}}{=} (g_{\pi}^{s_i})^S \pmod p$
   for each $g_{\pi}^{s_i}$ \\
 \item $\exists g_{\pi} \in \mathbb{Z}^*_q$, check if
-  $v_i \stackrel{\text{\tiny ?}}{=} (g_{\pi}^S)^{s_i} \bmod p$
+  $v_i \stackrel{\text{\tiny ?}}{=} (g_{\pi}^S)^{s_i} \pmod p$
   for each $s_i$
 \end{enumerate}
 For the former case we need $S$ and for the latter case we need
 $g_{\pi}^S$. From the protocol 1, we can obtain either $g^S \bmod p$
 for $\forall g \in \mathbb{Z}$ or $g_{\pi}^{aS} \bmod p$. Obtaining
-$S$ is simply the {\sf DLOG} problem. $g_{\pi}^S \bmod p$ can be
+$S$ is simply the {\sf DLog} problem. $g_{\pi}^S \bmod p$ can be
 obtained iff $g$ happens to be $g_{\pi}$ or a legitimate client
 chooses $a = 1$ which must be excluded.
 If $g_{\pi}^S$ is obtained, the dictionary attack is possible on
