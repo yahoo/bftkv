@@ -5,7 +5,7 @@ BFTKV is a distributed key-value storage which is tolerant to Byzantine fault. S
 ### Additional documents:
 [Design Document (restricted)](https://docs.google.com/document/d/14xYeGR291UKba1pimO9DnFNvfZ3ceTYsfbWZbgpWkTQ/edit?usp=sharing)
 
-[Paper](docs/bftkv.pdf)
+[Paper (draft)](docs/bftkv.pdf)
 
 [HTTP-API](docs/http_api.md)
 
