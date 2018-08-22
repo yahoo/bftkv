@@ -7,7 +7,7 @@ storage in distributed systems. We briefly describe the original
 quorum systems and its extension called Byzantine quorum
 systems. Later, we construct a byzantine quorum system based on Web of
 Trust.
-The system defines two operations, {\em read} and {\em write}, between
+The system defines two operations, {\sf read} and {\sf write}, between
 a client and a set of servers called a quorum. A quorum system ($QS
 \subseteq 2^U$) is a subset of the powerset of all servers ($U$), and
 it satisfies a property:
@@ -102,11 +102,15 @@ $\mathcal{T'}$ is a subset of $\{1..n\}$ and $|\mathcal{T'}| =
 signature $(r, s)$ which invovles additions and multiplications of
 shared variables, such that:
 \begin{align*}
-  r &= g^k \bmod p \bmod q\\
-  s &= k^{-1}(x + mr) \bmod q
+  r &= g^{k^{-1}} \bmod p \bmod q\\
+  s &= k(x + mr) \bmod q
 \end{align*}
-from partial signatures $(r_i, s_i)$, where
+from partial signatures $(r_i, v_i, s_i)$:
 \begin{align*}
-  r_i &= g^{k_i} \bmod p \bmod q\\
-  s_i &= k_i^{-1}(x_i + mr_i) \bmod q
+  r_i &= g^{a_i} \bmod p \\
+  v_i &= k_ia_i \bmod q \\
+  s_i &= k_i(x_i + mr) \bmod q
 \end{align*}
+where $x_i$ is the share of the private key for each node. $(a_i, k_i)$ is
+generated randomly by each node. See \cite{Gennaro} for how to
+construct $r$ from $(r_i, v_i)$.

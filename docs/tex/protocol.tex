@@ -13,7 +13,7 @@ data. $s_C$ and $S$ can be omitted.
 \begin{tabular}{cl}
   $x$ & \begin{minipage}[t]{0.8\columnwidth}%
     is the variable and an arbitrary length octet
-    string. The variable will be the key on the key-value store.%
+    string. The variable will be the ``key'' of the key-value store.%
   \end{minipage}\\
   $t$ & \begin{minipage}[t]{0.8\columnwidth}%
     is the timestamp and a 64-bit non-negative
@@ -60,8 +60,9 @@ specified in Phalanx.\\
      & \text{ where } s_C = (Sign_C(\langle x, t, v \rangle), Cert_C) \\
   Q_i :& \text{ verify $s_C$ with $C$'s quorum certificates} \\
   Q_i :& \text{ check the TOFU policy} \\
-  C \rightarrow Q_i :& \text{ } S_i = \{\langle x, t, v, s_C \rangle\}_{Q_i} \\
-  C :& \text{ collect signatures } \\
+  C \leftarrow Q_i :& \text{ } S_i = \{\langle x, t, v, s_C
+  \rangle\}_{Q_i \in Q} \\
+  C :& \text{ collect signatures from $|\mathcal{T}|$ members} \\
      & \text{ } S = \{S_i\}_{i \in \mathcal{T}} \\
   C :& \text{ choose a quorum from } Q' = U \setminus QC \\
   C \rightarrow Q' :& \text{ write}(\langle x, t, v, s_C, S \rangle) \\
