@@ -58,10 +58,10 @@ fabricated $g$, he cannot calculate $g_{\pi'}^S \bmod p$ in
 order to brute force for $g_{\pi'} \notin \{g^e | e = 1..p-1\}$.
 
 \subsection{Resistance to offline dictionary attacks}
-Under the same condition of MiTM, what the client can obtain is:
+Under the same condition as MiTM, what the client can obtain is:
 \begin{align*}
   y_i &= f(i) \\
-  v_i &= g_{\pi}^{Ssi} \bmod p
+  v_i &= g_{\pi}^{Ss_i} \bmod p
 \end{align*}
 for $i \in \mathcal{L}$. We also get $G_S = g_{\pi}^{aS} \bmod p$ from
 the step 2, and $Z_i = E_{h(K_i)}(Pi, X_i||Y_i)$ from the step

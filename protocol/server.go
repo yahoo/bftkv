@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"net/url"
 	"math"
-	"time"
 	"log"
 
 	"github.com/yahoo/bftkv"
@@ -26,19 +25,8 @@ import (
 type Server struct {
 	Protocol
 	st storage.Storage
+	auth map[string]*auth.AuthServer	// per variable
 }
-
-type AuthHistory struct {
-	t time.Time
-	n int
-}
-
-const (
-	AUTH_MIN_DURATION = (10 * time.Second)	// 10 sec
-	AUTH_DELAY_RATE = (1 * time.Second)	// increase 1 sec per retry
-	AUTH_RETRY_LIMIT = 10
-	authHistoryPostfix = "......stayaway"
-)
 
 var hiddenPrefix = []byte("!!!secret!!!")
 	
@@ -52,6 +40,7 @@ func NewServer(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Transpor
 			threshold: threshold.New(crypt),
 		},
 		st: st,
+		auth: make(map[string]*auth.AuthServer),
 	}
 }
 
@@ -193,8 +182,6 @@ func (s *Server) read(req []byte, peer node.Node) ([]byte, error) {
 		if proof == nil || s.crypt.CollectiveSignature.Verify(variable, proof, s.qs.ChooseQuorum(quorum.AUTH)) != nil {
 			return nil, bftkv.ErrAuthenticationFailure
 		}
-		// auth succeeded -- clear the history
-		s.clearAuthHistory(variable)
 	}
 	return tvs, nil
 }
@@ -250,8 +237,6 @@ func (s *Server) sign(req []byte, peer node.Node) ([]byte, error) {
 			if s.crypt.CollectiveSignature.Verify(variable, ss, s.qs.ChooseQuorum(quorum.AUTH)) != nil {
 				return nil, bftkv.ErrAuthenticationFailure
 			}
-			// auth succeeded -- clear the history
-			s.clearAuthHistory(variable)
 		}
 
 		// make sure not to sign both <x, v, t> and <x, v', t>
@@ -422,54 +407,44 @@ func (s *Server) authenticate(req []byte, peer node.Node) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	rdata, err := s.st.Read(variable, 0)	// read the latest one
-	if err != nil {
-		return nil, crypto.ErrNoAuthenticationData
-	}
-	_, _, _, _, _, rauth, err := packet.Parse(rdata)
-	if err != nil {
-		return nil, err
-	}
-	if rauth == nil {
-		return nil, crypto.ErrNoAuthenticationData
-	}
-	var res []byte
-	if phase == 0 {
-		res, err = auth.MakeYi(rauth, authdata)
+	as, ok := s.auth[string(variable)]
+	if !ok {
+		rdata, err := s.st.Read(variable, 0)	// read the latest one
+		if err != nil {
+			return nil, crypto.ErrNoAuthenticationData
+		}
+		_, _, _, _, _, rauth, err := packet.Parse(rdata)
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		ss, err := s.crypt.CollectiveSignature.Sign(variable)	// @@ signing over only variables which means you can keep the proof for the later use
-		if err != nil {
-			return nil, err
+		if rauth == nil {
+			return nil, crypto.ErrNoAuthenticationData
 		}
-		sig, err := packet.SerializeSignature(ss)
-		if err != nil {
-			return nil, err
-		}
-		res, err = auth.MakeBi(rauth, authdata, sig)
-		if err != nil {
-			return nil, err
-		}
-	}
 
-	// check and save the auth history
-	hist, err := s.readAuthHistory(variable)
-	if err == nil && time.Since(hist.t) < AUTH_MIN_DURATION {
-		delay := time.Duration(hist.n) * AUTH_DELAY_RATE
-		time.Sleep(delay)
-		hist.n++
-		if hist.n >= AUTH_RETRY_LIMIT {
-			// at the moment just keep a log
-			log.Printf("server[%s]: auth: too many retry from %s on %v\n", s.self.Name(), peer.Name(), variable)
+		// make the collective signature now... but never be sent until all auth processes are done
+		sig, err := s.crypt.CollectiveSignature.Sign(variable)
+		if err != nil {
+			return nil, err
 		}
-	} else {
-		hist = &AuthHistory{time.Now(), 0}	// should be #phases - 2
-	}
-	s.writeAuthHistory(variable, hist)
+		proof, err := packet.SerializeSignature(sig)
+		if err != nil {
+			return nil, err
+		}
 
-	return res, nil
+		as, err = auth.NewServer(rauth, proof)
+		if err != nil {
+			return nil, err
+		}
+		s.auth[string(variable)] = as
+	}
+	res, done, err := as.MakeResponse(phase, authdata)
+	if err == crypto.ErrAuthTooManyAttempts {
+		// at the moment just keep a log
+		log.Printf("server [%s]: auth: too many attempts from %s", s.self.Name(), peer.Name())
+	} else if done || err != nil {
+		delete(s.auth, string(variable))
+	}
+	return res, err
 }
 
 func (s *Server) register(req []byte, peer node.Node) ([]byte, error) {
@@ -498,8 +473,6 @@ func (s *Server) register(req []byte, peer node.Node) ([]byte, error) {
 	if err := s.crypt.CollectiveSignature.Verify(variable, ss, s.qs.ChooseQuorum(quorum.AUTH)); err != nil {
 		return nil, err
 	}
-	// auth succeeded -- clear the history
-	s.clearAuthHistory(variable)
 
 	var ret []byte
 	certs, err := s.crypt.Certificate.Parse(value)
@@ -586,45 +559,11 @@ func (s *Server) notify(req []byte, peer node.Node) ([]byte, error) {
 	return nil, nil
 }
 
-func (s *Server) readAuthHistory(variable []byte) (*AuthHistory, error) {
-	data, err := s.st.Read(append(variable, []byte(authHistoryPostfix)...), 0)
-	if err != nil {
-		return nil, err
-	}
-	r := bytes.NewReader(data)
-	var t int64
-	if err := binary.Read(r, binary.BigEndian, &t); err != nil {
-		return nil, err
-	}
-	var n uint32
-	if err := binary.Read(r, binary.BigEndian, &n); err != nil {
-		return nil, err
-	}
-	return &AuthHistory{time.Unix(t, 0), int(n)}, nil
-}
-
-func (s *Server) writeAuthHistory(variable []byte, hist *AuthHistory) error {
-	var buf bytes.Buffer
-	t := hist.t.Unix()
-	if err := binary.Write(&buf, binary.BigEndian, t); err != nil {
-		return err
-	}
-	n := uint32(hist.n)
-	if err := binary.Write(&buf, binary.BigEndian, n); err != nil {
-		return err
-	}
-	return s.st.Write(append(variable, []byte(authHistoryPostfix)...), 0, buf.Bytes())
-}
-
-func (s *Server) clearAuthHistory(variable []byte) error {
-	return s.writeAuthHistory(variable, &AuthHistory{time.Now(), 0})
-}
-
 func (s *Server) Handler(cmd int, r io.Reader, w io.Writer) error {
 	req, nonce, peer, err := s.crypt.Message.Decrypt(r)
 	if err != nil {
 		if cmd != transport.Join || req == nil {	// the requester's cert might not have been in the keyring. The cert will be verifie by quorums to join
-			log.Printf("server [%s]: transport security error: %s\n", s.self.Name(), err)
+			log.Printf("server [%s]: transport security error: %s", s.self.Name(), err)
 			return err
 		}
 	}

@@ -15,26 +15,34 @@ func testAuth(t *testing.T, password []byte, proof []byte) {
 	k := 7
 	n := 10
 
-	ss, err := GeneratePartialAuthenticationParams(password, n, k)
+	params, err := GeneratePartialAuthenticationParams(password, n, k)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	var ss []*AuthServer
+	for _, p := range params {
+		s, err := NewServer(p, proof)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ss = append(ss, s)
+	}
 	c := NewClient(password, n, k)
 
-	X, err := c.GenerateX()
+	X, err := c.generateX()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var Xis map[uint64][]byte
 	for i := 0; i < n; i++ {
-		Yi, err := MakeYi(ss[i], X)
+		Yi, err := ss[i].makeYi(X)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		Xis, err = c.ProcessYi(Yi, uint64(i))
+		Xis, err = c.processYi(Yi, uint64(i))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -43,21 +51,51 @@ func testAuth(t *testing.T, password []byte, proof []byte) {
 		}
 	}
 	if Xis == nil {
-		t.Error("not enough responses")
+		t.Error("not enough responses for Xi")
 		return
 	}
 
+	var Nis map[uint64][]byte
 	for id, Xi := range Xis {
-		Bi, err := MakeBi(ss[id], Xi, proof)
+		Bi, err := ss[id].makeBi(Xi)
 		if err != nil {
 			t.Fatal(err)
 		}
-		Pi, err := c.ProcessBi(Bi, id)
+		Nis, err = c.processBi(Bi, id)
 		if err != nil {
 			t.Fatal(err)
 		}
+		if Nis != nil {
+			break
+		}
+	}
+	if Nis == nil {
+		t.Error("not enough responses for Ni")
+		return
+	}
+
+	var Pis map[uint64][]byte
+	for id, Ni := range Nis {
+		Zi, err := ss[id].makeZi(Ni)
+		if err != nil {
+			t.Fatal(err)
+		}
+		Pis, err = c.processZi(Zi, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if Pis != nil {
+			break
+		}
+	}
+	if Pis == nil || len(Pis) < k {
+		t.Error("not enough response for Pi")
+		return
+	}
+
+	for id, Pi := range Pis {
 		if !bytes.Equal(Pi, proof) {
-			t.Error("decryption failed")
+			t.Errorf("%d: decryption failed", id)
 		}
 	}
 }

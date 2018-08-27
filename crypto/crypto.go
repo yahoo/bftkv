@@ -25,6 +25,7 @@ var (
 	ErrInsufficientNumberOfSecrets = bftkv.NewError("crypto: insufficient number of secrets")
 	ErrInvalidInput = bftkv.NewError("crypto: invalid input")
 	ErrNoAuthenticationData = bftkv.NewError("crypto: no authentication data")
+	ErrAuthTooManyAttempts = bftkv.NewError("crypto: too many attempts")
 	ErrUnsupported = bftkv.NewError("crypto: unsupported algorithm")
 	ErrInsufficientNumberOfThresholdSignatures = bftkv.NewError("crypto: insufficient number of threshold signatures")
 	ErrShareNotFound = bftkv.NewError("crypto: share not found")
@@ -67,13 +68,6 @@ type CollectiveSignature interface {
 	Sign(tbs []byte) (partialSignature *packet.SignaturePacket, err error)
 	Combine(ss *packet.SignaturePacket, s *packet.SignaturePacket, q quorum.Quorum) bool
 	Signers(ss *packet.SignaturePacket) []node.Node
-}
-
-type AuthenticationClient interface {
-	GenerateX() ([]byte, error)
-	ProcessYi(res []byte, id uint64) (map[uint64][]byte, error)
-	ProcessBi(res []byte, id uint64) ([]byte, error)
-	GetCipherKey() ([]byte, error)
 }
 
 type DataEncryption interface {

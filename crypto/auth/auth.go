@@ -5,23 +5,34 @@ package auth
 
 import (
 	"bytes"
+	"io"
 	"crypto/sha256"
 	"crypto/rand"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
+	"crypto/subtle"
 	"math/big"
 	"encoding/binary"
+	"time"
 
+	"golang.org/x/crypto/hkdf"
+
+	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/sss"
 	"github.com/yahoo/bftkv/packet"
+	"github.com/yahoo/bftkv/node"
 )
 
 type AuthPartialSecret struct {
 	sss.Coordinate
 	salt []byte
 	a2 *big.Int	// a': the second random exp
-	Xi *big.Int
+	Xi []byte
+	Ni []byte
+	Pi []byte
+	keys AuthKey
 }
 
 type AuthClient struct {
@@ -29,8 +40,17 @@ type AuthClient struct {
 	a *big.Int	// a: the primary random exp
 	gs *big.Int	// shared secret g_pi^(a*S)
 	X *big.Int
-	results map[uint64]*AuthPartialSecret
+	secrets map[uint64]*AuthPartialSecret
 	k, n int
+	nresponses int
+}
+
+type AuthServer struct {
+	params *AuthParams
+	proof []byte
+	attempts int
+	keys AuthKey
+	mac []byte
 }
 
 type AuthParams struct {
@@ -39,6 +59,22 @@ type AuthParams struct {
 	v *big.Int
 	salt []byte
 }
+
+const (
+	MAC_KEY_SIZE = 16
+	ENC_KEY_SIZE = 16
+)
+
+type AuthKey struct {
+	km [MAC_KEY_SIZE]byte	// mac key
+	ke [ENC_KEY_SIZE]byte	// enc key
+}
+
+const (
+	AUTH_MIN_DURATION = (10 * time.Second)	// 10 sec
+	AUTH_DELAY_RATE = (1 * time.Second)	// increase 1 sec per retry
+	AUTH_RETRY_LIMIT = 10
+)
 
 var (
 	// has to be a safe prime, i.e., p = 2q + 1
@@ -117,21 +153,53 @@ func GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error
 	return res, nil
 }
 
-func MakeYi(ss []byte, X []byte) (res []byte, err error) {
+func NewServer(ss []byte, proof []byte) (*AuthServer, error) {
 	params, err := parseParams(ss)
 	if err != nil {
 		return nil, err
 	}
-	Yi := new(big.Int).SetBytes(X)
-	Yi.Exp(Yi, params.y, p)
-	return serializeYi(params.x, Yi, params.salt)
+	return &AuthServer{
+		params: params,
+		proof: proof,
+		attempts: 0,
+	}, nil
 }
 
-func MakeBi(ss []byte, Xi []byte, proof []byte) (res []byte, err error) {
-	params, err := parseParams(ss)
-	if err != nil {
-		return nil, err
+func (s *AuthServer) MakeResponse(phase int, req []byte) (res []byte, done bool, err error) {
+	switch phase {
+	case 0:
+		res, err = s.makeYi(req)
+		if err != nil {
+			return
+		}
+		// check if this is a retry
+		delay := time.Duration(s.attempts) * AUTH_DELAY_RATE
+		if delay > 0 {
+			time.Sleep(delay)
+		}
+		s.attempts++
+		if s.attempts >= AUTH_RETRY_LIMIT {
+			err = crypto.ErrAuthTooManyAttempts
+			return
+		}
+		done = false
+	case 1:
+		res, err = s.makeBi(req)
+		done = false
+	case 2:
+		res, err = s.makeZi(req)
+		done = true
 	}
+	return
+}
+
+func (s *AuthServer) makeYi(X []byte) (res []byte, err error) {
+	Yi := new(big.Int).SetBytes(X)
+	Yi.Exp(Yi, s.params.y, p)
+	return serializeYi(s.params.x, Yi, s.params.salt)
+}
+
+func (s *AuthServer) makeBi(Xi []byte) (res []byte, err error) {
 	b, err := rand.Int(rand.Reader, p)
 	if err != nil {
 		return nil, err
@@ -139,100 +207,79 @@ func MakeBi(ss []byte, Xi []byte, proof []byte) (res []byte, err error) {
 
 	// Bi = v_i^b
 	Bi := new(big.Int)
-	Bi.Exp(params.v, b, p)
+	Bi.Exp(s.params.v, b, p)
 
 	// Ki = Xi^b
 	Ki := new(big.Int).SetBytes(Xi)
 	Ki.Exp(Ki, b, p)
-	ks := Ki.Bytes()
+	if err := keySched(&s.keys, Ki.Bytes(), s.params.salt); err != nil {
+		return nil, err
+	}
 
-	// encrypt the data with ks
-	block, err := aes.NewCipher(hash(ks))
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	nonce := make([]byte, aead.NonceSize())		// random nonce is ok as the key is never reused
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
-	}
-	Zi := aead.Seal(nil, nonce, proof, append(Xi, Bi.Bytes()...))
-	return serializeBi(Bi, Zi, nonce)
+	// Ni = MAC(Xi || Bi)
+	s.mac = calculateMac(s.keys.km, Xi, Bi.Bytes())
+
+	return serializeBi(Bi)
 }
 
-func NewClient(cred []byte, n, k int) crypto.AuthenticationClient {
+func (s *AuthServer) makeZi(Ni []byte) (res []byte, err error) {
+	// check the MAC
+	if subtle.ConstantTimeCompare(Ni, s.mac) != 1 {
+		return nil, bftkv.ErrAuthenticationFailure
+	}
+
+	// encrypt the data with ks
+	Zi, nonce, err := encrypt(s.keys.ke, s.proof, s.mac)
+	if err != nil {
+		return nil, err
+	}
+	return serializeZi(Zi, nonce)
+}
+
+func NewClient(cred []byte, n, k int) *AuthClient {
 	return &AuthClient{
 		password: cred,
-		results: make(map[uint64]*AuthPartialSecret),
+		secrets: make(map[uint64]*AuthPartialSecret),
 		k: k,
 		n: n,
 	}
 }
 
-func (c *AuthClient) GenerateX() ([]byte, error) {
-	a, err := rand.Int(rand.Reader, q)
+func (c *AuthClient) Initiate(nodes []node.Node) (map[uint64][]byte, error) {
+	X, err := c.generateX()
 	if err != nil {
 		return nil, err
 	}
-	X := new(big.Int).Exp(PI(c.password), a, p)
-	c.a = a
-	return X.Bytes(), nil
+	res := make(map[uint64][]byte)
+	for _, peer := range nodes {
+		res[peer.Id()] = X
+	}
+	return res, nil
 }
 
-func (c *AuthClient) ProcessYi(res []byte, id uint64) (Xis map[uint64][]byte, err error) {
-	x, Yi, salt, err := parseYi(res)
-	if err != nil {
-		return nil, err
-	}
-	c.results[id] = &AuthPartialSecret{sss.Coordinate{X: x, Y: Yi}, salt, nil, nil}
-	if len(c.results) >= c.k {
-		c.gs = c.calculateSharedSecret()
-		Xis = make(map[uint64][]byte)
-		for id, peer := range c.results {
-			a2, err := rand.Int(rand.Reader, q)
-			if err != nil {
-				return nil, nil
-			}
-			peer.a2 = a2
-			si := new(big.Int).SetBytes(hash(c.password, peer.salt))
-			e := new(big.Int).Mod(new(big.Int).Mul(a2, si), q)
-			Xi := new(big.Int).Exp(c.gs, e, p)
-			peer.Xi = Xi
-			Xis[id] = Xi.Bytes()
+func (c *AuthClient) ProcessResponse(phase int, data []byte, peer node.Node) (res map[uint64][]byte, err error) {
+	switch phase {
+	case 0:
+		res, err = c.processYi(data, peer.Id())
+		if err != nil {
+			return
+		}
+	case 1:
+		res, err = c.processBi(data, peer.Id())
+		if err != nil {
+			return
+		}
+	case 2:
+		res, err = c.processZi(data, peer.Id())
+		if err != nil {
+			return
 		}
 	}
-	return Xis, nil
+	return
 }
 
-func (c *AuthClient) ProcessBi(res []byte, id uint64) (proof []byte, err error) {
-	Bi, Zi, nonce, err := parseBi(res)
-	if err != nil {
-		return nil, err
-	}
-	peer, ok := c.results[id]
-	if !ok {
-		return nil, crypto.ErrNoAuthenticationData
-	}
-	e := new(big.Int).Mul(c.a, peer.a2)
-	e.Mod(e, q)
-	Ki := new(big.Int).Exp(Bi, e, p)
-	ks := Ki.Bytes()
-	block, err := aes.NewCipher(hash(ks))
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	proof, err = aead.Open(nil, nonce, Zi, append(peer.Xi.Bytes(), Bi.Bytes()...))
-	if err != nil {
-		return nil, crypto.ErrDecryptionFailed
-	}
-	return proof, err
+func (c *AuthClient) Done(phase int) bool {
+	return phase > 2
 }
 
 func (c *AuthClient) GetCipherKey() ([]byte, error) {
@@ -244,16 +291,108 @@ func (c *AuthClient) GetCipherKey() ([]byte, error) {
 	return hash(gs.Bytes(), c.password), nil
 }
 
+func (c *AuthClient) generateX() ([]byte, error) {
+	a, err := rand.Int(rand.Reader, q)
+	if err != nil {
+		return nil, err
+	}
+	X := new(big.Int).Exp(PI(c.password), a, p)
+	c.a = a
+	return X.Bytes(), nil
+}
+
+func (c *AuthClient) processYi(res []byte, id uint64) (map[uint64][]byte, error) {
+	x, Yi, salt, err := parseYi(res)
+	if err != nil {
+		return nil, err
+	}
+	c.secrets[id] = &AuthPartialSecret{sss.Coordinate{X: x, Y: Yi}, salt, nil, nil, nil, nil, AuthKey{}}
+	if len(c.secrets) >= c.k {
+		c.gs = c.calculateSharedSecret()
+		Xis := make(map[uint64][]byte)
+		for i, secret := range c.secrets {
+			a2, err := rand.Int(rand.Reader, q)
+			if err != nil {
+				return nil, nil
+			}
+			secret.a2 = a2
+			si := new(big.Int).SetBytes(hash(c.password, secret.salt))
+			e := new(big.Int).Mod(new(big.Int).Mul(a2, si), q)
+			Xi := new(big.Int).Exp(c.gs, e, p)
+			secret.Xi = Xi.Bytes()
+			Xis[i] = secret.Xi
+		}
+		c.nresponses = 0
+		return Xis, nil
+	}
+	return nil, nil
+}
+
+func (c *AuthClient) processBi(res []byte, id uint64) (map[uint64][]byte, error) {
+	Bi, err := parseBi(res)
+	if err != nil {
+		return nil, err
+	}
+	secret, ok := c.secrets[id]
+	if !ok {
+		return nil, crypto.ErrNoAuthenticationData
+	}
+
+	// Ki = Bi^{aa'}
+	e := new(big.Int).Mul(c.a, secret.a2)
+	e.Mod(e, q)
+	Ki := new(big.Int).Exp(Bi, e, p)
+	keySched(&secret.keys, Ki.Bytes(), secret.salt)
+	secret.Ni = calculateMac(secret.keys.km, secret.Xi, Bi.Bytes())
+
+	c.nresponses++
+	if c.nresponses >= len(c.secrets) {
+		N := make(map[uint64][]byte)
+		for i, secret := range c.secrets {
+			N[i] = secret.Ni
+		}
+		c.nresponses = 0
+		return N, nil
+	}
+	return nil, nil
+}
+
+func (c *AuthClient) processZi(res []byte, id uint64) (map[uint64][]byte, error) {
+	Zi, nonce, err := parseZi(res)
+	if err != nil {
+		return nil, err
+	}
+	secret, ok := c.secrets[id]
+	if !ok {
+		return nil, crypto.ErrNoAuthenticationData
+	}
+
+	secret.Pi, err = decrypt(secret.keys.ke, Zi, secret.Ni, nonce)
+	if err != nil {
+		return nil, crypto.ErrDecryptionFailed
+	}
+
+	c.nresponses++
+	if c.nresponses >= len(c.secrets) {
+		P := make(map[uint64][]byte)
+		for i, secret := range c.secrets {
+			P[i] = secret.Pi
+		}
+		return P, nil
+	}
+	return nil, nil
+}
+
 func (c *AuthClient) calculateSharedSecret() *big.Int {
 	// g^s = (g^(y0))^l0 * (g^(y1))^l1 * ... 
 	gs := big.NewInt(1)
 	var xs []int
-	for _, r := range c.results {
-		xs = append(xs, r.X)
+	for _, s := range c.secrets {
+		xs = append(xs, s.X)
 	}
-	for _, res := range c.results {
-		l := sss.Lagrange(res.X, xs, q)
-		t := new(big.Int).Exp(res.Y, l, p)
+	for _, s := range c.secrets {
+		l := sss.Lagrange(s.X, xs, q)
+		t := new(big.Int).Exp(s.Y, l, p)
 		gs.Mod(gs.Mul(gs, t), p)
 	}
 	return gs
@@ -353,11 +492,24 @@ func parseYi(res []byte) (x int, Y *big.Int, salt []byte, err error) {
 	return
 }
 
-func serializeBi(Bi *big.Int, Zi []byte, nonce []byte) ([]byte, error) {
+func serializeBi(Bi *big.Int) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := writeBigInt(buf, Bi); err != nil {
 		return nil, err
 	}
+	return buf.Bytes(), nil
+}
+
+func parseBi(res []byte) (Bi *big.Int, err error) {
+	r := bytes.NewReader(res)
+	if Bi, err = readBigInt(r); err != nil {
+		return
+	}
+	return
+}
+
+func serializeZi(Zi []byte, nonce []byte) ([]byte, error) {
+	buf := new(bytes.Buffer)
 	if err := packet.WriteChunk(buf, Zi); err != nil {
 		return nil, err
 	}
@@ -367,11 +519,8 @@ func serializeBi(Bi *big.Int, Zi []byte, nonce []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func parseBi(res []byte) (Bi *big.Int, Zi []byte, nonce []byte, err error) {
+func parseZi(res []byte) (Zi []byte, nonce []byte, err error) {
 	r := bytes.NewReader(res)
-	if Bi, err = readBigInt(r); err != nil {
-		return
-	}
 	if Zi, err = packet.ReadChunk(r); err != nil {
 		return
 	}
@@ -379,4 +528,51 @@ func parseBi(res []byte) (Bi *big.Int, Zi []byte, nonce []byte, err error) {
 		return
 	}
 	return
+}
+
+func keySched(keys *AuthKey, ks []byte, salt []byte) error {
+	hkdf := hkdf.New(sha256.New, ks, salt, nil)
+	if _, err := io.ReadFull(hkdf, keys.km[:]); err != nil {
+		return err
+	}
+	if _, err := io.ReadFull(hkdf, keys.ke[:]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func calculateMac(km [MAC_KEY_SIZE]byte, Xi []byte, Bi []byte) []byte {
+	hmac := hmac.New(sha256.New, km[:])
+	hmac.Write(Xi)
+	hmac.Write(Bi)
+	return hmac.Sum(nil)
+}
+
+func encrypt(ke [ENC_KEY_SIZE]byte, plain []byte, adata []byte) (res []byte, nonce []byte, err error) {
+	block, err := aes.NewCipher(ke[:])
+	if err != nil {
+		return nil, nil, err
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, nil, err
+	}
+	nonce = make([]byte, aead.NonceSize())		// random nonce is ok as the key is never reused
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, nil, err
+	}
+	res = aead.Seal(nil, nonce, plain, adata)
+	return res, nonce, nil
+}
+
+func decrypt(ke [ENC_KEY_SIZE]byte, ciphertext []byte, adata[]byte, nonce []byte) ([]byte, error) {
+	block, err := aes.NewCipher(ke[:])
+	if err != nil {
+		return nil, err
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	return aead.Open(nil, nonce, ciphertext, adata)
 }

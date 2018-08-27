@@ -175,7 +175,7 @@ func (api *API) Read(variable []byte, password string) (value []byte, err error)
 	if err != nil {
 		return nil, err
 	}
-	if key != nil {
+	if key != nil && value != nil && len(value) > 0 {
 		value, err = api.crypt.DataEncryption.Decrypt(key, value)
 		if err != nil {
 			return nil, err

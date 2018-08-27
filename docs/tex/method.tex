@@ -164,9 +164,9 @@ where:
 \begin{align*}
   y_i &= f(i) \\
   v_i &= g_{\pi}^{Ss_i} \bmod p \\
-  s_i &= \text{OS2I}(h(password, t_i)) \\
+  s_i &= \text{\sf OS2I}(H(pw, t_i)) \\
   g_{\pi} &= \pi^2 \bmod p \\
-  \pi &= \text{OS2I}(h(password))
+  \pi &= \text{\sf OS2I}(H(pw))
 \end{align*}
 $p$ and $q$ are prime numbers such that $p = 2q + 1$ (i.e., $p$ is a
 safe prime). $t_i$ is a salt. The random polynomial must be generated
@@ -207,37 +207,42 @@ To get a password authenticated:
   \]
   where
   \[
-    s_i = h(password, t_i)
+    s_i = H(pw, t_i)
   \]
 
 \item Each quorum member($\in \mathcal{T}$) generates a random exponent
-  $b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q$
-  for a DH session key:
-  \[ K_i = X_i^{b_i} \bmod p \]
-  and encrypts the proof ($P_i = Sig_i(\centerdot)$):
+  $b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q$ and send back:
   \[
-    Z_i = E_{h(K_i)}(P_i, X || Y_i)
+    B_i = v_i^{b_i} \bmod p
   \]
-  then sends it back to the client with
-  \[
-    B_i = v_i^{b_i} \bmod p.
-  \]
+  The DH session key is:
+  \[ K_i = X_i^{b_i} \bmod p \].
 
-\item The client decrypts $Z_i$ with
+\item The client shares the session key with $Q_i$:
   \[
     K_i = B_i^{aa'} \bmod p
   \]
-  and gets:
+  then requests to get the proof with {\em MAC}:
   \[
-    (P_i, N) = D_{h(K_i)}(Z_i).
+    N_i := \text{\em MAC}(H(K_i), X_i || B_i)
+  \].
+
+\item Each quorum member sends back encrypted proof
+  ($P_i = Sig_{Q_i}(\centerdot)$) only if the {\em MAC} is correct:
+  \[
+    Z_i = E_{H(K_i)}(P_i, N_i)
+  \].
+
+\item The client decrypts $Z_i$ with $K_i$ and gets:
+  \[
+    (P_i, A) = D_{H(K_i)}(Z_i)
   \]
-  Check if $N = X||Y_i$ to make sure both parties have shared the
-  session key correctly. 
+  Check if $A = N_i$ to make sure the proof is fresh.
 \end{enumerate}
 We use $\{P_i\}_{\{i \in \mathcal{T}\}}$ as the proof of
 authentication which will be attached to protocol messages and checked
 at each node during the {\sf read / write / register} protocols. The
-signed data in each $P_i = Sig_i(\centerdot)$ depends on those
+signed data for each $P_i = Sig_{Q_i}(\centerdot)$ depends on those
 protocols.
 
 \ifdefined\ABSTRACT
@@ -249,7 +254,7 @@ $G_S$ will be:
   G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = g_{\pi}^{a \sum_{j
       \in \mathcal{T}} f(j) \lambda_j} = (g_{\pi}^S)^a \bmod p
 \]
-and by raising $s_i = h(password, s_i)$ to $G_S$, we get:
+and by raising $s_i = H(pw, s_i)$ to $G_S$, we get:
 \[
   X_i = G_S^{s_i} = (g_{\pi}^{Ss_i})^a \bmod p
 \]

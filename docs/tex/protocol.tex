@@ -128,9 +128,16 @@ review of $\mathcal{TPA}$ \ref{auth}.
   C \rightarrow Q_i &: X_i := G_S^{s_ia'} \bmod p \\
   Q_i &: K_i \leftarrow X_i^{b_i} \bmod p, \;
         b_i \xleftarrow{\mathcal{R}} \mathbb{Z}_q \\
-  C \leftarrow Q_i &: B_i := v_i^{b_i} \bmod p,
-                     Z_i := E_{K_i}(P_i, \dots) 
+  C \leftarrow Q_i &: B_i := v_i^{b_i} \bmod p \\
+  C &: K_i \leftarrow B_i^{aa'} \bmod p \\
+  C \rightarrow Q_i &: N_i := \text{\em MAC}(K_i, X_i || B_i) \\
+  C \leftarrow Q_i &: Z_i := E_{K_i}(P_i, N_i) \\
+  C &: (P_i, N_i) = D_{K_i}(Z_i)
 \end{align*}
-
 At the end of the protocol, $C$ obtains the proof $P = \{P_i\}_{i \in
   \mathcal{T}}$.
+
+The servers keep track of the client ID, the number of attempts and
+the time. If the process does not go through next time the first
+response from each server will be slowed down to mitigate online
+dictionary attacks.
