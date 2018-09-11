@@ -79,7 +79,7 @@ For RSA signatures, it may seem straightforward to apply SSS to the
 RSA signing process such as:
 \[ S = M^{f(0)} = \prod_{i \in \mathcal{T}} M^{f(i)\lambda_i} \bmod N \]
 however, since to calculate $\lambda_i$ we need the multiplicative
-inverse on $\varphi(N)$ which must be kept as secret as the private
+inverse in $\varphi(N)$ which must be kept as secret as the private
 key, we cannot simply appy SSS to RSA signatures. Shoup \cite{shoup}
 solved this problem by getting rid of multiplicative inverse all
 together but it needs a special construction of the RSA parameters,

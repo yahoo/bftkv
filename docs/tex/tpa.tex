@@ -7,11 +7,11 @@ $G_S$ will be:
   G_S = \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} = g_{\pi}^{a \sum_{j
       \in \mathcal{T}} f(j) \lambda_j} = g_{\pi}^{aS} \pmod p
 \]
-and by raising $s_i = h(password, t_i)$ to $G_S$, we get:
+and by raising $s_i = H(pw, u_i)$ to $G_S$, we get:
 \[
   X_i = (G_S^{s_i})^{a'} = (g_{\pi}^{Ss_i})^{aa'} \pmod p
 \]
-which must be the same as $v_i^{a} \bmod p$ for each $i \in
+which must be the same as $v_i^{aa'} \bmod p$ for each $i \in
 \mathcal{T}$ iff the correct password ($g_{\pi}$) is given at the
 step 1. With each $B_i = v_i^{b_i} \bmod p$, the client and servers
 share DH keys $K_i = g_{\pi}^{Ss_iaa'b_i} \bmod p$.
@@ -24,48 +24,51 @@ t$, correct $G_S$ cannot be obtained.
 
 \begin{proof}
 $S$ cannot be reconstructed from $|\mathcal{L}|$ servers, from the SSS
-  property, thus $g_{\pi}^S$ cannot be obtained.
+  property, thus $g_{\pi}^{aS}$ cannot be obtained whatever $a$ is.
 \end{proof}
 
 \subsection{Protocol Analysis}
-We look into the protocols by dividing it into two parts: the first
-roundtrip (step 1 and 2) is to recover the shared secret $S$, and
-the second roundtrip (step 3 and 4) is for key exchange.
+We look into the $\mathcal{TPA}$ protocols by dividing it into two
+parts: the first roundtrip (step 1 and 2) is to recover the shared
+secret $S$, and the second roundtrip (step 3 and 4) is for key
+exchange.
 
 $g_{\pi} = \pi^2 \bmod p$, where $\pi$ is a secure hash value over the
 password, is a safe generator in $\mathbb{Z}^*_q$ with high
-probability. Raise a random exponent $a$ to mask the generator at the
-step 1. 
+probability. Raise a random exponent $a$ to mask the
+generator. Servers blindly raise its own share $y_i$ to whatever $X =
+g_{\pi}^a$ is. As long as $p$ is a safe prime $X^{y_i} \bmod p$ does
+not reveal $y_i$.
 
 The second roundtrip can be seen as the traditional $DH$ with the
-generator $G_S^{s_i}$ where $s_i := h(pw, t_i)$. $t_i$ is a salt
+generator $G_S^{s_i}$ where $s_i := H(pw, u_i)$. $u_i$ is a salt
 generated uniquely for each server. Another random exponent $a'$ is
 applied for making it difficult to do offline dictionary attacks over
 $s_i$.
 
 \subsection{Resistance to MiTM}
 Assume we have $|\mathcal{L}| < t$ compromised servers and try to
-reconstruct $g_{\pi}^S \bmod p$ from ${y_i}$. From the Lemma
-~\ref{tpa1} we need at least one $Y_i$, $i \notin \mathcal{L}$, and
-unless the server $i$ is not compromised the only way to get $Y_i$ is
-to issue the protocol $X = g_{\pi}^a \bmod p$. Unless the attacker
-knows $\pi$ all he can do is to guess the password and to keep asking
-the server to calculate $Y_i = g_{\pi'}^a \bmod p$ for $\pi'$. If the
-guess is wrong $Y'_i$ will not calculate $g_{\pi}^S$ correctly with
-the compromised data $\{f(j)\}_{j \in \mathcal{L}}$.
+reconstruct $g_{\pi}^S$ from $\{y_i\}_{i \in \mathcal{L}}$.
+From the Lemma ~\ref{tpa1} we need at least one $Y_i$, $i \notin
+\mathcal{L}$, and unless the server $i$ is not compromised the only
+way to get $Y_i$ is to issue the protocol $X = g_{\pi}^a \bmod
+p$. Unless the attacker knows $\pi$ all he can do is to guess the
+password and to keep asking the server to calculate $Y_i = g_{\pi'}^a
+\bmod p$ for $\pi'$. If the guess is wrong $Y'_i$ will not calculate
+$g_{\pi}^S$ correctly with the compromised data $\{f(j)\}_{j \in
+\mathcal{L}}$.
 Unless the attacker can calculate $S$ from $g^S \bmod p$ with a
 fabricated $g$, he cannot calculate $g_{\pi'}^S \bmod p$ in
 order to brute force for $g_{\pi'} \notin \{g^e | e = 1..p-1\}$.
 
 \subsection{Resistance to offline dictionary attacks}
-Under the same condition as MiTM, what the client can obtain is:
+Under the same assumption as MiTM, what the client can obtain is:
 \begin{align*}
   y_i &= f(i) \\
   v_i &= g_{\pi}^{Ss_i} \bmod p
 \end{align*}
 for $i \in \mathcal{L}$. We also get $G_S = g_{\pi}^{aS} \bmod p$ from
-the step 2, and $Z_i = E_{h(K_i)}(Pi, X_i||Y_i)$ from the step
-4. $B_i$ will not contribute anything to the attack as they already
+the step 2. $B_i$ will not contribute anything to the attack as they already
 have $v_i$.
 To brute force on $v_i$ there are two possible ways:
 \begin{enumerate}

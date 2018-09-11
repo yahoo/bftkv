@@ -49,14 +49,14 @@ specified in Phalanx.\\
 \begin{align*}
   C :& \text{ choose a quorum from quorum cliques} \\
      & Q \in QC \\
-  C \rightarrow Q :& \text{ {\sf get timestamp}}(x) \\
+  C \rightarrow Q :& \text{ \sf get timestamp}(x) \\
   C \leftarrow Q_i :& \text{ } t_i \\
   C :& \text{ collect } 2b+1 \text{ timestamps: } \\
      & \text{ } \{t_i\}_{i \in \mathcal{T}}, |\mathcal{T}|=2b+1,
        \mathcal{T} \subseteq Q \\
   C :& \text{ choose the maximum timestamp } \\
      & \text{ } t = max(t_i) + 1 \\
-  C \rightarrow Q :& \text{ {\sf get signature}}(\langle x, t, v, s_C \rangle),\\
+  C \rightarrow Q :& \text{ \sf get signature}(\langle x, t, v, s_C \rangle),\\
      & \text{ where } s_C = (Sign_C(\langle x, t, v \rangle), Cert_C) \\
   Q_i :& \text{ verify $s_C$ with $C$'s quorum certificates} \\
   Q_i :& \text{ check the TOFU policy} \\
@@ -65,17 +65,17 @@ specified in Phalanx.\\
   C :& \text{ collect signatures from $|\mathcal{T}|$ members} \\
      & \text{ } S = \{S_i\}_{i \in \mathcal{T}} \\
   C :& \text{ choose a quorum from } Q' = U \setminus QC \\
-  C \rightarrow Q' :& \text{ write}(\langle x, t, v, s_C, S \rangle) \\
+  C \rightarrow Q' :& \text{ \sf write}(\langle x, t, v, s_C, S \rangle) \\
   Q'_i :& \text{ verify the signature set $S$} \\
   Q'_i :& \text{ do the equivocation check} \\
-  Q'_i :& \text{ store } \langle x, t, v, S_C, S \rangle
+  Q'_i :& \text{ \sf store}(\langle x, t, v, S_C, S \rangle)
 \end{align*}
 
 [ {\sf read} ]
 \setcounter{equation}{0}
 \begin{align*}
   C :&\; \text{choose a quorum } Q \in U \setminus QC \\
-  C \rightarrow Q :&\; read(x) \\
+  C \rightarrow Q :&\; \text{\sf read}(x) \\
   C \leftarrow Q_i :&\; M_i = \langle x, t, v, s_C, S \rangle \\
   C :&\; \text{collect } f + 1 \text{ responses} \\
   C :&\; \text{verify the signature set $S$} \\
@@ -83,7 +83,7 @@ specified in Phalanx.\\
   C :&\; \text{choose the latest timestamp } \\
      &\; t_L = max(M_i.t) \\
   C :&\; Q' = \{Q_i \subset Q | M_i.t < t_L\} \\
-  C \rightarrow Q' :&\; \text{{\sf write back}}(\langle x, t_L, v, s_C, S \rangle)
+  C \rightarrow Q' :&\; \text{\sf write back}(\langle x, t_L, v, s_C, S \rangle)
 \end{align*}
 
 
@@ -117,13 +117,13 @@ before processing the request. The follwing diagram is for a quick
 review of $\mathcal{TPA}$ \ref{auth}.
 
 \begin{align*}
-  C &: \pi \leftarrow h(pw), \;
+  C &: \pi \leftarrow H(pw), \;
       g_{\pi} \leftarrow \pi^2, \;
       a \xleftarrow{\mathcal{R}} \mathbb{Z}_q \\
   C \rightarrow Q &: X := g_{\pi}^a \bmod p \\
-  C \leftarrow Q_i &: Y_i := X^{y_i} \bmod p, t_i \\
+  C \leftarrow Q_i &: Y_i := X^{y_i} \bmod p, u_i \\
   C &: G_S \leftarrow \textstyle \prod_{j \in \mathcal{T}}Y_i^{\lambda_j} \bmod p, \\
-    & \; s_i \leftarrow h(pw, t_i), \;
+    & \; s_i \leftarrow H(pw, u_i), \;
       a' \xleftarrow{\mathcal{R}} \mathbb{Z}_q \\
   C \rightarrow Q_i &: X_i := G_S^{s_ia'} \bmod p \\
   Q_i &: K_i \leftarrow X_i^{b_i} \bmod p, \;
