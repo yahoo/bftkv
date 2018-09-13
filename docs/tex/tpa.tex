@@ -38,34 +38,53 @@ password, is a safe generator in $\mathbb{Z}^*_q$ with high
 probability. Raise a random exponent $a$ to mask the
 generator. Servers blindly raise its own share $y_i$ to whatever $X =
 g_{\pi}^a$ is. As long as $p$ is a safe prime $X^{y_i} \bmod p$ does
-not reveal $y_i$.
+not reveal $y_i$ whatever $X$ is.
 
-The second roundtrip can be seen as the traditional $DH$ with the
+The second roundtrip can be seen as the Elgamal encryption with a
 generator $G_S^{s_i}$ where $s_i := H(pw, u_i)$. $u_i$ is a salt
-generated uniquely for each server. Another random exponent $a'$ is
-applied for making it difficult to do offline dictionary attacks over
-$s_i$.
+generated uniquely for each server. The encrypted data is sent in the
+next roundtrip.  Another random exponent $a'$ is applied to make it
+difficult to do offline dictionary attacks over $s_i$.
 
-\subsection{Resistance to MiTM}
+The last roundtrip (step 4 and 5) is to check if both parties have
+shared a random session key and to obtain a proof. The client receives
+the encrypted data iff the MAC is verified at the server, otherwise it
+will receive $\bot$.
+
+\subsection{Reduction to Elgamal Encryption}
+Since $\mathbb{Z}_p^*$ is a cyclic group, there exist $g \in
+\mathbb{Z}_p^*$ and $x \in \mathbb{Z}_p$ such that $g_{\pi} = g^x
+\pmod p$ therefore in the step 3, $X_i = G_S^{s_ia'}$ can be
+seen as a $DH$ term: $g^{x'}$ where $x' = xSs_iaa' \bmod q$. The
+session key is the same as the standard Elgamal encryption, i.e.,
+$(g^{x'})^{b_i}$.
+At the step 4, the server returns $B_i = v_i^{b_i}$ where $v_i =
+g^{x'/aa'} \pmod p$. For any $aa' \in \mathbb{Z}_q$ there exist a
+multiplicative inverse in $\mathbb{Z}_q$ such that $v_i^{aa'} = g
+\pmod p$. Therefore we get the standard Elgamal key such as $B_i^{aa'}
+= (g^{x'})^{b_i} \pmod p$.
+
+\subsection{Resistance to offline dictionary attacks}
 Assume we have $|\mathcal{L}| < t$ compromised servers and try to
 reconstruct $g_{\pi}^S$ from $\{y_i\}_{i \in \mathcal{L}}$.
 From the Lemma ~\ref{tpa1} we need at least one $Y_i$, $i \notin
 \mathcal{L}$, and unless the server $i$ is not compromised the only
 way to get $Y_i$ is to issue the protocol $X = g_{\pi}^a \bmod
-p$. Unless the attacker knows $\pi$ all he can do is to guess the
-password and to keep asking the server to calculate $Y_i = g_{\pi'}^a
-\bmod p$ for $\pi'$. If the guess is wrong $Y'_i$ will not calculate
-$g_{\pi}^S$ correctly with the compromised data $\{f(j)\}_{j \in
-\mathcal{L}}$.
+p$ in the step 1.
+Unless the attacker knows $\pi$ all he can do is to guess the
+password $\pi'$ and to keep asking the server to calculate $Y'_i =
+g_{\pi'}^a \bmod p$. If the guess is wrong $Y'_i$ will not
+calculate $g_{\pi}^S$ correctly with the compromised data $\{f(j)\}_{j
+\in \mathcal{L}}$.
 Unless the attacker can calculate $S$ from $g^S \bmod p$ with a
 fabricated $g$, he cannot calculate $g_{\pi'}^S \bmod p$ in
-order to brute force for $g_{\pi'} \notin \{g^e | e = 1..p-1\}$.
+order to brute force for $g_{\pi'} \in \{g^e | e = 1..p-1\}$.
 
-\subsection{Resistance to offline dictionary attacks}
-Under the same assumption as MiTM, what the client can obtain is:
+Next, we look into dictionary attacks for {\em share} that is
+revealed from compromised servers, i.e.,
 \begin{align*}
   y_i &= f(i) \\
-  v_i &= g_{\pi}^{Ss_i} \bmod p
+  v_i &= g_{\pi}^{Ss_i} \bmod p \\
 \end{align*}
 for $i \in \mathcal{L}$. We also get $G_S = g_{\pi}^{aS} \bmod p$ from
 the step 2. $B_i$ will not contribute anything to the attack as they already
