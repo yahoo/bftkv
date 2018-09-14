@@ -56,19 +56,19 @@ Since $\mathbb{Z}_p^*$ is a cyclic group, there exist $g \in
 \mathbb{Z}_p^*$ and $x \in \mathbb{Z}_p$ such that $g_{\pi} = g^x
 \pmod p$ therefore in the step 3, $X_i = G_S^{s_ia'}$ can be
 seen as a $DH$ term: $g^{x'}$ where $x' = xSs_iaa' \bmod q$. The
-session key is the same as the standard Elgamal encryption, i.e.,
-$(g^{x'})^{b_i}$.
+session key on the server side is the same as the standard Elgamal
+encryption, i.e., $(g^{x'})^{b_i}$.
 At the step 4, the server returns $B_i = v_i^{b_i}$ where $v_i =
 g^{x'/aa'} \pmod p$. For any $aa' \in \mathbb{Z}_q$ there exist a
-multiplicative inverse in $\mathbb{Z}_q$ such that $v_i^{aa'} = g
+multiplicative inverse in $\mathbb{Z}_q$ such that $v_i^{aa'} = g^{x'}
 \pmod p$. Therefore we get the standard Elgamal key such as $B_i^{aa'}
-= (g^{x'})^{b_i} \pmod p$.
+= (g^{x'})^{b_i} \pmod p$ on the client side.
 
 \subsection{Resistance to offline dictionary attacks}
 Assume we have $|\mathcal{L}| < t$ compromised servers and try to
 reconstruct $g_{\pi}^S$ from $\{y_i\}_{i \in \mathcal{L}}$.
 From the Lemma ~\ref{tpa1} we need at least one $Y_i$, $i \notin
-\mathcal{L}$, and unless the server $i$ is not compromised the only
+\mathcal{L}$, and unless the server $i$ is compromised the only
 way to get $Y_i$ is to issue the protocol $X = g_{\pi}^a \bmod
 p$ in the step 1.
 Unless the attacker knows $\pi$ all he can do is to guess the
