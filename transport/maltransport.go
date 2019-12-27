@@ -10,4 +10,3 @@ import (
 type MalTransportServer interface {
 	MalHandler(cmd int, r io.Reader, w io.Writer) error
 }
-

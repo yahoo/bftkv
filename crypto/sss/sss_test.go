@@ -4,10 +4,10 @@
 package sss
 
 import (
-	"testing"
+	"bytes"
 	"math/big"
 	"math/rand"
-	"bytes"
+	"testing"
 	"time"
 )
 

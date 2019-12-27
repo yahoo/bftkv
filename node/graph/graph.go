@@ -4,42 +4,42 @@
 package graph
 
 import (
-	"io"
 	"bytes"
-	"sync"
+	"io"
 	"log"
+	"sync"
 
 	"github.com/yahoo/bftkv/node"
 )
 
 type Vertex struct {
-	Edges map[uint64]*Vertex	// @@ redudant... should be []uint64?
+	Edges    map[uint64]*Vertex // @@ redudant... should be []uint64?
 	Instance node.Node
 }
 
 type Graph struct {
 	Vertices map[uint64]*Vertex
-	Revoked map[uint64]node.Node
-	Self []*Vertex
-	mutex sync.Mutex
+	Revoked  map[uint64]node.Node
+	Self     []*Vertex
+	mutex    sync.Mutex
 }
 
 type Clique struct {
-	Nodes []node.Node
+	Nodes  []node.Node
 	Weight int
 }
 
 func NewVertex(instance node.Node) *Vertex {
 	return &Vertex{
 		Instance: instance,
-		Edges: make(map[uint64]*Vertex),
+		Edges:    make(map[uint64]*Vertex),
 	}
 }
 
 func New() *Graph {
 	return &Graph{
 		Vertices: make(map[uint64]*Vertex),
-		Revoked: make(map[uint64]node.Node),
+		Revoked:  make(map[uint64]node.Node),
 	}
 }
 
@@ -55,7 +55,7 @@ func (g *Graph) AddNodes(nodes []node.Node) []node.Node {
 			self = NewVertex(n)
 			g.Vertices[skid] = self
 		} else {
-			self.Instance = n	// replace the instance with the newly added one
+			self.Instance = n // replace the instance with the newly added one
 		}
 		// add the signers unless they have been revoked
 		for _, signer := range n.Signers() {
@@ -64,7 +64,7 @@ func (g *Graph) AddNodes(nodes []node.Node) []node.Node {
 			}
 			v, ok := g.Vertices[signer]
 			if !ok {
-				v = NewVertex(nil)	// keep the instance nil
+				v = NewVertex(nil) // keep the instance nil
 				g.Vertices[signer] = v
 			}
 			v.Edges[skid] = self
@@ -256,7 +256,6 @@ func (g *Graph) Active() bool {
 	return true
 }
 
-
 //
 // internal APIs
 //
@@ -331,7 +330,7 @@ func inClique(e node.Node, cliques []Clique) bool {
 }
 
 // find a single maximal clique, assuming there exists only one maximal clique that includes 's' therefore maximal = maximum
-func (g * Graph) findMaximalClique(s *Vertex) *Clique {
+func (g *Graph) findMaximalClique(s *Vertex) *Clique {
 	clique := []*Vertex{s}
 	// walk thru all nodes
 	for _, v := range g.Vertices {
@@ -404,7 +403,7 @@ func (g *Graph) GetInReachable(destinations []node.Node) []node.Node {
 		found := false
 		for _, d := range destinations {
 			did := d.Id()
-			if did == tid {	// exclude destinations themselves from the result
+			if did == tid { // exclude destinations themselves from the result
 				found = false
 				break
 			} else if _, ok := v.Edges[did]; ok {

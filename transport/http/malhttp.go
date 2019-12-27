@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	_ "github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/crypto"
+	_ "github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/transport"
 )
 
@@ -20,10 +20,10 @@ type MalTrHTTP struct {
 
 func MalNew(security *crypto.Crypto) transport.Transport {
 	h := &MalTrHTTP{
-	             TrHTTP: TrHTTP{
-                             security: security,
-		     },
-             }
+		TrHTTP: TrHTTP{
+			security: security,
+		},
+	}
 
 	// client
 	tr := &http.Transport{

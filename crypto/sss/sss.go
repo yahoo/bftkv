@@ -4,8 +4,8 @@
 package sss
 
 import (
-	"math/big"
 	"crypto/rand"
+	"math/big"
 )
 
 type Coordinate struct {
@@ -15,9 +15,9 @@ type Coordinate struct {
 
 type SSSProcess struct {
 	n, k int
-	m *big.Int
-	res []*Coordinate
-	S []byte
+	m    *big.Int
+	res  []*Coordinate
+	S    []byte
 }
 
 func Distribute(secret *big.Int, n, k int, m *big.Int) ([]*Coordinate, error) {
@@ -48,11 +48,11 @@ func Distribute(secret *big.Int, n, k int, m *big.Int) ([]*Coordinate, error) {
 
 func NewProcess(secrets []*Coordinate, n, k int, m *big.Int) (*SSSProcess, error) {
 	p := &SSSProcess{
-		n: n,
-		k: k,
-		m: m,
+		n:   n,
+		k:   k,
+		m:   m,
 		res: nil,
-		S: nil,
+		S:   nil,
 	}
 	for _, secret := range secrets {
 		S, err := p.ProcessResponse(secret)

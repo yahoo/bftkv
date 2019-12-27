@@ -4,18 +4,18 @@
 package plain
 
 import (
-	"os"
-	"io/ioutil"
-	"sync"
 	"encoding/hex"
-	"strings"
+	"io/ioutil"
+	"os"
 	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/yahoo/bftkv/storage"
 )
 
 type plain struct {
-	path string
+	path  string
 	mutex sync.Mutex
 }
 

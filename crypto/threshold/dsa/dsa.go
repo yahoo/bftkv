@@ -4,9 +4,9 @@
 package dsa
 
 import (
+	"bytes"
 	godsa "crypto/dsa"
 	"math/big"
-	"bytes"
 
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/sss"
@@ -36,8 +36,8 @@ func (g *dsaGroupOperations) CalculateR(rs []*PartialR) *big.Int {
 	for _, ri := range rs {
 		xs = append(xs, ri.X)
 	}
-	r := big.NewInt(1)	// r = g^a mod p
-	v := big.NewInt(0)	// v = a*k mod q
+	r := big.NewInt(1) // r = g^a mod p
+	v := big.NewInt(0) // v = a*k mod q
 	t := new(big.Int)
 	for _, ri := range rs {
 		l := sss.Lagrange(ri.X, xs, g.params.Q)
@@ -46,8 +46,8 @@ func (g *dsaGroupOperations) CalculateR(rs []*PartialR) *big.Int {
 		t.Mod(t.Mul(ri.Vi, l), g.params.Q)
 		v.Mod(v.Add(v, t), g.params.Q)
 	}
-	v.ModInverse(v, g.params.Q)	// v = v^-1 mod q
-	r.Exp(r, v, g.params.P)		// r = r^v mod q
+	v.ModInverse(v, g.params.Q) // v = v^-1 mod q
+	r.Exp(r, v, g.params.P)     // r = r^v mod q
 	return r.Mod(r, g.params.Q)
 }
 

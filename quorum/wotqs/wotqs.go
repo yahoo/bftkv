@@ -4,21 +4,21 @@
 package wotqs
 
 import (
-	"github.com/yahoo/bftkv/quorum"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/node/graph"
+	"github.com/yahoo/bftkv/quorum"
 )
 
 type wot struct {
 	g *graph.Graph
 }
 
-type qc struct {	// quarum clique
-	nodes []node.Node
-	f int
-	min int
+type qc struct { // quarum clique
+	nodes     []node.Node
+	f         int
+	min       int
 	threshold int
-	suff int
+	suff      int
 }
 
 type wotq struct {
@@ -35,7 +35,7 @@ func New(g *graph.Graph) quorum.QuorumSystem {
 
 func (qs *wot) newQC(clique graph.Clique, rw int) *qc {
 	var nodes []node.Node
-	if (rw & quorum.PEER) != 0 {	// exclude the self node
+	if (rw & quorum.PEER) != 0 { // exclude the self node
 		self := qs.g.GetSelfId()
 		for _, n := range clique.Nodes {
 			if n.Id() != self {
@@ -54,13 +54,13 @@ func (qs *wot) newQC(clique graph.Clique, rw int) *qc {
 	}
 	f := (n - 1) / 3
 	if f >= 1 {
-		min := 3 * f + 1
-		threshold := 2 * f + 1
-		suff := f + (n - f) / 2 + 1
+		min := 3*f + 1
+		threshold := 2*f + 1
+		suff := f + (n-f)/2 + 1
 		if (rw & (quorum.CERT | quorum.READ)) != 0 {
 			threshold = f + 1
 		}
-		if clique.Weight <= n - suff {
+		if clique.Weight <= n-suff {
 			suff = 0
 		}
 		return &qc{nodes, f, min, threshold, suff}
@@ -96,7 +96,7 @@ func (qs *wot) getQuorumFrom(rw int, s uint64, distance int) *wotq {
 	q := &wotq{}
 	cliques := qs.g.GetCliques(s, distance)
 	for _, c := range cliques {
-		if qc := qs.newQC(c, rw | quorum.AUTH); qc != nil {
+		if qc := qs.newQC(c, rw|quorum.AUTH); qc != nil {
 			q.qcs = append(q.qcs, *qc)
 		}
 	}
@@ -105,9 +105,9 @@ func (qs *wot) getQuorumFrom(rw int, s uint64, distance int) *wotq {
 		if (rw & quorum.AUTH) == 0 {
 			qcs = nil
 		}
-		qcs = qs.complement(qs.g.GetReachableNodes(s, distance), q.qcs, qcs, quorum.READ)	// R = {Vi} - {Ci}
+		qcs = qs.complement(qs.g.GetReachableNodes(s, distance), q.qcs, qcs, quorum.READ) // R = {Vi} - {Ci}
 		if (rw & quorum.WRITE) != 0 {
-			qcs = qs.complement(qs.g.GetPeers(), append(q.qcs, qcs...), qcs, quorum.WRITE)	// W = U - {Ci} + R
+			qcs = qs.complement(qs.g.GetPeers(), append(q.qcs, qcs...), qcs, quorum.WRITE) // W = U - {Ci} + R
 		}
 		q.qcs = qcs
 	}
@@ -126,10 +126,9 @@ func (qs *wot) ChooseQuorum(rw int) quorum.Quorum {
 	return qs.getQuorumFrom(rw, qs.g.GetSelfId(), distance)
 }
 
-
 //
 // quorum
-// 
+//
 func (q *wotq) Nodes() []node.Node {
 	var r []node.Node
 	for _, qc := range q.qcs {

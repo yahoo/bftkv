@@ -4,30 +4,30 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
-	"context"
-	"time"
-	"net/http"
-	"io/ioutil"
-	"strings"
 	"strconv"
-	"log"
-	"fmt"
+	"strings"
+	"syscall"
+	"time"
 
 	"net/http/pprof"
 
-	"github.com/yahoo/bftkv/protocol"
-	"github.com/yahoo/bftkv/node"
-	"github.com/yahoo/bftkv/node/graph"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/pgp"
+	"github.com/yahoo/bftkv/node"
+	"github.com/yahoo/bftkv/node/graph"
+	"github.com/yahoo/bftkv/protocol"
 	"github.com/yahoo/bftkv/quorum/wotqs"
 	"github.com/yahoo/bftkv/storage"
-	storage_plain "github.com/yahoo/bftkv/storage/plain"
 	storage_leveldb "github.com/yahoo/bftkv/storage/leveldb"
+	storage_plain "github.com/yahoo/bftkv/storage/plain"
 	"github.com/yahoo/bftkv/transport"
 	transport_http "github.com/yahoo/bftkv/transport/http"
 	transport_http_visual "github.com/yahoo/bftkv/transport/http-visual"
@@ -115,7 +115,7 @@ func main() {
 		apiServer.Stop()
 	}
 	bftServer.Stop()
-	
+
 	// save pubring and revocation list
 	// writeCerts(g, crypt, pubring)	// don't write it back for now, as all nodes leave when this program terminates
 	// writeRevocationList(g, crypt, revocation)
@@ -154,7 +154,7 @@ func readRevocationList(g *graph.Graph, crypt *crypto.Crypto, path string) {
 
 func writeCerts(g *graph.Graph, crypt *crypto.Crypto, path string) {
 	log.Printf("writing back certs: %s\n", path)
-	os.Rename(path, path + "~")
+	os.Rename(path, path+"~")
 	f, err := os.Create(path)
 	if err != nil {
 		log.Print(err)
@@ -169,7 +169,7 @@ func writeCerts(g *graph.Graph, crypt *crypto.Crypto, path string) {
 
 func writeRevocationList(g *graph.Graph, crypt *crypto.Crypto, path string) {
 	log.Printf("saving the revocation list: %s\n", path)
-	os.Rename(path, path + "~")
+	os.Rename(path, path+"~")
 	f, err := os.Create(path)
 	if err != nil {
 		log.Print(err)
@@ -182,27 +182,26 @@ func writeRevocationList(g *graph.Graph, crypt *crypto.Crypto, path string) {
 	}
 }
 
-
 //
 // HTTP API
 //
 
 type apiService struct {
-	bftClient *protocol.Client
-	g *graph.Graph
+	bftClient  *protocol.Client
+	g          *graph.Graph
 	httpServer *http.Server
 }
 
 func (s *apiService) Start(port int) {
 	s.httpServer = &http.Server{
-		Addr: ":" + strconv.Itoa(port),
+		Addr:    ":" + strconv.Itoa(port),
 		Handler: s,
 	}
 	go s.httpServer.ListenAndServe()
 }
 
 func (s *apiService) Stop() {
-	ctx, _ := context.WithTimeout(context.Background(), 10 * time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	s.httpServer.Shutdown(ctx)
 	s.httpServer.Close()
 }

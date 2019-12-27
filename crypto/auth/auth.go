@@ -5,15 +5,15 @@ package auth
 
 import (
 	"bytes"
-	"io"
-	"crypto/sha256"
-	"crypto/rand"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
-	"math/big"
 	"encoding/binary"
+	"io"
+	"math/big"
 	"time"
 
 	"golang.org/x/crypto/hkdf"
@@ -21,42 +21,42 @@ import (
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/sss"
-	"github.com/yahoo/bftkv/packet"
 	"github.com/yahoo/bftkv/node"
+	"github.com/yahoo/bftkv/packet"
 )
 
 type AuthPartialSecret struct {
 	sss.Coordinate
 	salt []byte
-	a2 *big.Int	// a': the second random exp
-	Xi []byte
-	Ni []byte
-	Pi []byte
+	a2   *big.Int // a': the second random exp
+	Xi   []byte
+	Ni   []byte
+	Pi   []byte
 	keys AuthKey
 }
 
 type AuthClient struct {
-	password []byte
-	a *big.Int	// a: the primary random exp
-	gs *big.Int	// shared secret g_pi^(a*S)
-	X *big.Int
-	secrets map[uint64]*AuthPartialSecret
-	k, n int
+	password   []byte
+	a          *big.Int // a: the primary random exp
+	gs         *big.Int // shared secret g_pi^(a*S)
+	X          *big.Int
+	secrets    map[uint64]*AuthPartialSecret
+	k, n       int
 	nresponses int
 }
 
 type AuthServer struct {
-	params *AuthParams
-	proof []byte
+	params   *AuthParams
+	proof    []byte
 	attempts int
-	keys AuthKey
-	mac []byte
+	keys     AuthKey
+	mac      []byte
 }
 
 type AuthParams struct {
-	x int
-	y *big.Int
-	v *big.Int
+	x    int
+	y    *big.Int
+	v    *big.Int
 	salt []byte
 }
 
@@ -66,14 +66,14 @@ const (
 )
 
 type AuthKey struct {
-	km [MAC_KEY_SIZE]byte	// mac key
-	ke [ENC_KEY_SIZE]byte	// enc key
+	km [MAC_KEY_SIZE]byte // mac key
+	ke [ENC_KEY_SIZE]byte // enc key
 }
 
 const (
-	AUTH_MIN_DURATION = (10 * time.Second)	// 10 sec
-	AUTH_DELAY_RATE = (1 * time.Second)	// increase 1 sec per retry
-	AUTH_RETRY_LIMIT = 10
+	AUTH_MIN_DURATION = (10 * time.Second) // 10 sec
+	AUTH_DELAY_RATE   = (1 * time.Second)  // increase 1 sec per retry
+	AUTH_RETRY_LIMIT  = 10
 )
 
 var (
@@ -109,14 +109,14 @@ var (
 		0xb8, 0xa6, 0x17, 0x74, 0xd3, 0xaf, 0x3f, 0x1c, 0xce,
 		0x2b, 0x95, 0xda, 0xd3,
 	}
-	p *big.Int = new(big.Int).SetBytes(pb)
+	p   *big.Int = new(big.Int).SetBytes(pb)
 	phi *big.Int = new(big.Int).Sub(p, big.NewInt(1))
-	q *big.Int = new(big.Int).Div(phi, big.NewInt(2))
+	q   *big.Int = new(big.Int).Div(phi, big.NewInt(2))
 )
 
 func GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error) {
 	// calculate sss coordinates
-	s, err := rand.Int(rand.Reader, q)	// the secret
+	s, err := rand.Int(rand.Reader, q) // the secret
 	if err != nil {
 		return nil, err
 	}
@@ -140,9 +140,9 @@ func GeneratePartialAuthenticationParams(cred []byte, n, k int) ([][]byte, error
 		params.x = c.X
 		params.y = c.Y
 		params.salt = hash(salt, []byte{byte(i)})
-		si := new(big.Int).SetBytes(hash(cred, params.salt))	// si = hash(pass, hash(salt, i))
+		si := new(big.Int).SetBytes(hash(cred, params.salt)) // si = hash(pass, hash(salt, i))
 		si.Mod(si.Mul(si, s), q)
-		params.v = new(big.Int).Exp(pi, si, p)	// vi = g_pi^(S*si)
+		params.v = new(big.Int).Exp(pi, si, p) // vi = g_pi^(S*si)
 
 		ss, err := serializeParams(&params)
 		if err != nil {
@@ -159,8 +159,8 @@ func NewServer(ss []byte, proof []byte) (*AuthServer, error) {
 		return nil, err
 	}
 	return &AuthServer{
-		params: params,
-		proof: proof,
+		params:   params,
+		proof:    proof,
 		attempts: 0,
 	}, nil
 }
@@ -239,9 +239,9 @@ func (s *AuthServer) makeZi(Ni []byte) (res []byte, err error) {
 func NewClient(cred []byte, n, k int) *AuthClient {
 	return &AuthClient{
 		password: cred,
-		secrets: make(map[uint64]*AuthPartialSecret),
-		k: k,
-		n: n,
+		secrets:  make(map[uint64]*AuthPartialSecret),
+		k:        k,
+		n:        n,
 	}
 }
 
@@ -384,7 +384,7 @@ func (c *AuthClient) processZi(res []byte, id uint64) (map[uint64][]byte, error)
 }
 
 func (c *AuthClient) calculateSharedSecret() *big.Int {
-	// g^s = (g^(y0))^l0 * (g^(y1))^l1 * ... 
+	// g^s = (g^(y0))^l0 * (g^(y1))^l1 * ...
 	gs := big.NewInt(1)
 	var xs []int
 	for _, s := range c.secrets {
@@ -449,7 +449,7 @@ func parseParams(ss []byte) (*AuthParams, error) {
 	if err = binary.Read(r, binary.BigEndian, &t); err != nil {
 		return nil, err
 	}
-	params.x = int(t);
+	params.x = int(t)
 	if params.y, err = readBigInt(r); err != nil {
 		return nil, err
 	}
@@ -557,7 +557,7 @@ func encrypt(ke [ENC_KEY_SIZE]byte, plain []byte, adata []byte) (res []byte, non
 	if err != nil {
 		return nil, nil, err
 	}
-	nonce = make([]byte, aead.NonceSize())		// random nonce is ok as the key is never reused
+	nonce = make([]byte, aead.NonceSize()) // random nonce is ok as the key is never reused
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, nil, err
 	}
@@ -565,7 +565,7 @@ func encrypt(ke [ENC_KEY_SIZE]byte, plain []byte, adata []byte) (res []byte, non
 	return res, nonce, nil
 }
 
-func decrypt(ke [ENC_KEY_SIZE]byte, ciphertext []byte, adata[]byte, nonce []byte) ([]byte, error) {
+func decrypt(ke [ENC_KEY_SIZE]byte, ciphertext []byte, adata []byte, nonce []byte) ([]byte, error) {
 	block, err := aes.NewCipher(ke[:])
 	if err != nil {
 		return nil, err

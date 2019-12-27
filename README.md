@@ -14,7 +14,7 @@ BFTKV is a distributed key-value storage which is tolerant to Byzantine fault. S
 [Test Notes](docs/tests.md)
 
 ## Setup
-1. Install [Go 1.8](https://golang.org/doc/install).
+1. Install [Go 1.13](https://golang.org/doc/install).
 2. `go get -u github.com/yahoo/bftkv`
 3. Install [GnuPG 2.x](https://www.gnupg.org/download/index.en.html)
 4. Install [Docker](https://www.docker.com) (if you want to run BFTKV in a Docker container)
@@ -23,8 +23,9 @@ BFTKV is a distributed key-value storage which is tolerant to Byzantine fault. S
 
 ## Build
 ```
-cd /github.com/yahoo/bftkv
-go build -o bftkv cmd/main.go
+# change to the directory where the source code is checked out
+cd bftkv
+go install -v github.com/yahoo/bftkv/cmd/bftkv
 ```
 
 ## Parameters
@@ -58,7 +59,7 @@ BFTKV includes a visualization tool (located in `visual/`) for observing the cur
 
 * Trust graphs for the servers
 * Read, write and sign requests sent to the servers
-* Revoked and inaccessible servers 
+* Revoked and inaccessible servers
 
 To show the graph, run `run.sh` and `open visual/index.html`.
 
@@ -66,7 +67,7 @@ To show the graph, run `run.sh` and `open visual/index.html`.
 <img src="docs/images/write.gif" alt="Write"/>
 
 ### Revoke on Read in Action
-<img src="docs/images/revokeOnRead.gif" alt="Revoke on Read"/> 
+<img src="docs/images/revokeOnRead.gif" alt="Revoke on Read"/>
 
 ## License
 Copyright 2017, Yahoo Holdings Inc.

@@ -4,11 +4,11 @@
 package auth
 
 import (
-	"testing"
 	"bytes"
 	"crypto/rand"
-	"math/big"
 	"fmt"
+	"math/big"
+	"testing"
 )
 
 func testAuth(t *testing.T, password []byte, proof []byte) {

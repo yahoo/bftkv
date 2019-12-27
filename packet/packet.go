@@ -5,10 +5,9 @@ package packet
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"math/big"
-
-	"encoding/binary"
 )
 
 const (
@@ -24,11 +23,11 @@ const (
 //
 
 type SignaturePacket struct {
-	Type byte
-	Version uint32
+	Type      byte
+	Version   uint32
 	Completed bool
-	Data []byte
-	Cert []byte	// optional
+	Data      []byte
+	Cert      []byte // optional
 }
 
 // packetizer <x, v, t, sig, ss, auth>
@@ -38,15 +37,15 @@ func Serialize(args ...interface{}) ([]byte, error) {
 	for i, arg := range args {
 		var err error
 		switch i {
-		case 0, 1, 5:	// variable and value in []byte, and auth (optional)
+		case 0, 1, 5: // variable and value in []byte, and auth (optional)
 			if arg == nil {
-				err = WriteChunk(&buf, []byte{})	// empty slice
+				err = WriteChunk(&buf, []byte{}) // empty slice
 			} else {
 				err = WriteChunk(&buf, arg.([]byte))
 			}
-		case 2:		// timestamp
+		case 2: // timestamp
 			err = binary.Write(&buf, binary.BigEndian, arg.(uint64))
-		case 3, 4:	// *signature
+		case 3, 4: // *signature
 			if arg == nil {
 				err = writeSignature(&buf, nil)
 			} else {
@@ -277,7 +276,6 @@ func SerializeAuthenticationRequest(phase int, variable []byte, adata []byte) ([
 	}
 	return buf.Bytes(), nil
 }
-
 
 func ReadBigInt(r *bytes.Reader) (*big.Int, error) {
 	c, err := ReadChunk(r)

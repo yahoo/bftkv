@@ -4,11 +4,11 @@
 package dsa
 
 import (
+	"bytes"
 	gocrypto "crypto"
 	"crypto/rand"
-	"math/big"
-	"bytes"
 	"encoding/binary"
+	"math/big"
 
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/sss"
@@ -17,7 +17,7 @@ import (
 )
 
 type PartialR struct {
-	X int
+	X  int
 	Ri []byte
 	Vi *big.Int
 }
@@ -40,34 +40,34 @@ type kc struct {
 }
 
 type dsaContext struct {
-	g Group
-	crypt *crypto.Crypto
-	n, t int
-	nodes []node.Node
-	kmap map[uint64]*kc
+	g      Group
+	crypt  *crypto.Crypto
+	n, t   int
+	nodes  []node.Node
+	kmap   map[uint64]*kc
 	nonces map[uint64][]byte
-	algo crypto.ThresholdAlgo
+	algo   crypto.ThresholdAlgo
 }
 
 type encryptedShare struct {
-	coords []byte	// E_id({k,a,b,c})
-	id uint64
+	coords []byte // E_id({k,a,b,c})
+	id     uint64
 }
 
 func NewWithGroup(crypt *crypto.Crypto, g Group, algo crypto.ThresholdAlgo) crypto.Threshold {
 	return &dsaContext{
-		g: g,
-		crypt: crypt,
-		kmap: make(map[uint64]*kc),
+		g:      g,
+		crypt:  crypt,
+		kmap:   make(map[uint64]*kc),
 		nonces: make(map[uint64][]byte),
-		algo: algo,
+		algo:   algo,
 	}
 }
 
 func (ctx *dsaContext) Distribute(key interface{}, nodes []node.Node, t int) (shares [][]byte, algo crypto.ThresholdAlgo, err error) {
 	if t*2 > len(nodes) {
 		// return shares, algo, crypto.ErrInvalidInput
-		t = len(nodes) / 2	// @@ take the closest threshold for now
+		t = len(nodes) / 2 // @@ take the closest threshold for now
 	}
 	ctx.nodes = nodes
 	ctx.n = len(nodes)
@@ -94,7 +94,7 @@ func (ctx *dsaContext) Sign(sec []byte, req []byte, peerId, selfId uint64) ([]by
 	if err != nil {
 		return nil, err
 	}
-	if req == nil {	// the first phase, generate joint share for k, a, b, c
+	if req == nil { // the first phase, generate joint share for k, a, b, c
 		n := len(nodes)
 		k, err := generateJointRandom(t, n, q)
 		if err != nil {
@@ -112,7 +112,7 @@ func (ctx *dsaContext) Sign(sec []byte, req []byte, peerId, selfId uint64) ([]by
 		if err != nil {
 			return nil, err
 		}
-		shares, err := ctx.encrypt(k, a, b, c, nodes, peerId)	// js.k[i] corresponds to nodes[i] for all i
+		shares, err := ctx.encrypt(k, a, b, c, nodes, peerId) // js.k[i] corresponds to nodes[i] for all i
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +123,7 @@ func (ctx *dsaContext) Sign(sec []byte, req []byte, peerId, selfId uint64) ([]by
 		if err != nil {
 			return nil, err
 		}
-		if k_share != nil {	// the second phase
+		if k_share != nil { // the second phase
 			// ki = \Sum f_j(i)
 			x, ki, ai, bi, ci, err := ctx.decrypt(k_share, q, selfId, peerId)
 			if err != nil {
@@ -139,7 +139,7 @@ func (ctx *dsaContext) Sign(sec []byte, req []byte, peerId, selfId uint64) ([]by
 			}
 			// keep ki
 			ctx.kmap[peerId] = &kc{ki, ci}
-		} else {	// the final phase
+		} else { // the final phase
 			if m == nil || r == nil {
 				return nil, crypto.ErrInvalidInput
 			}
@@ -192,7 +192,7 @@ func (ctx *dsaContext) encrypt(k, a, b, c []*sss.Coordinate, nodes []node.Node, 
 		}
 		res = append(res, &encryptedShare{
 			coords: cipher,
-			id: peer.Id(),
+			id:     peer.Id(),
 		})
 	}
 	ctx.nonces[peerId] = nonce[:]
@@ -212,12 +212,12 @@ func (ctx *dsaContext) decrypt(shares [][]byte, q *big.Int, selfId, peerId uint6
 			err = err1
 			return
 		}
-		if signer.Id() == selfId {	// check if the nonce is fresh so at least this share is secure
+		if signer.Id() == selfId { // check if the nonce is fresh so at least this share is secure
 			if selfNonce, ok := ctx.nonces[peerId]; !ok || !bytes.Equal(nonce, selfNonce) {
 				err = crypto.ErrShareNotFound
 				return
 			}
-			err = nil	// clear the error -- to avoid to eliminate the self share
+			err = nil // clear the error -- to avoid to eliminate the self share
 		}
 		k, a, b, c, err1 := parseShare(plain)
 		if err1 != nil {
@@ -267,18 +267,18 @@ func parseShare(data []byte) (k, a, b, c *sss.Coordinate, err error) {
 }
 
 type dsaProc struct {
-	nodes []node.Node
-	t, n int
-	dgst []byte
-	m *big.Int	// calculate when the group parameters get available from a server
-	r *big.Int
-	s *big.Int
-	kmap map[uint64][][]byte
-	ri []*PartialR
-	si []*sss.Coordinate
-	phase int
+	nodes  []node.Node
+	t, n   int
+	dgst   []byte
+	m      *big.Int // calculate when the group parameters get available from a server
+	r      *big.Int
+	s      *big.Int
+	kmap   map[uint64][][]byte
+	ri     []*PartialR
+	si     []*sss.Coordinate
+	phase  int
 	result []byte
-	g Group
+	g      Group
 }
 
 func (ctx *dsaContext) NewProcess(tbs []byte, algo crypto.ThresholdAlgo, hash gocrypto.Hash) (crypto.ThresholdProcess, error) {
@@ -287,23 +287,23 @@ func (ctx *dsaContext) NewProcess(tbs []byte, algo crypto.ThresholdAlgo, hash go
 	dgst := h.Sum(nil)
 	return &dsaProc{
 		nodes: ctx.nodes,
-		t: ctx.t,
-		n: len(ctx.nodes),
-		dgst: dgst,
-		r: nil,
-		s: nil,
-		kmap: make(map[uint64][][]byte),
+		t:     ctx.t,
+		n:     len(ctx.nodes),
+		dgst:  dgst,
+		r:     nil,
+		s:     nil,
+		kmap:  make(map[uint64][][]byte),
 		phase: 0,
-		g: ctx.g,
+		g:     ctx.g,
 	}, nil
 }
 
 func (proc *dsaProc) MakeRequest() (nodes []node.Node, req []byte, err error) {
 	switch proc.phase {
 	case 0:
-		req = nil	// nothing to send
+		req = nil // nothing to send
 	case 1:
-		req, err = serializeSignRequest(nil, nil, proc.kmap)	// ineffective to put all shares into one packet and broadcast but for simplicity for now...
+		req, err = serializeSignRequest(nil, nil, proc.kmap) // ineffective to put all shares into one packet and broadcast but for simplicity for now...
 	case 2:
 		req, err = serializeSignRequest(proc.m, proc.r, nil)
 	}
@@ -318,7 +318,7 @@ func (proc *dsaProc) MakeRequest() (nodes []node.Node, req []byte, err error) {
 func (proc *dsaProc) ProcessResponse(data []byte, peer node.Node) ([]byte, error) {
 	proc.nodes = append(proc.nodes, peer)
 	switch proc.phase {
-	case 0:		// expecting joint share for k, a, b, c
+	case 0: // expecting joint share for k, a, b, c
 		shares, err := parseJointShare(data)
 		if err != nil {
 			return nil, err
@@ -326,7 +326,7 @@ func (proc *dsaProc) ProcessResponse(data []byte, peer node.Node) ([]byte, error
 		th := 0
 		for _, share := range shares {
 			proc.kmap[share.id] = append(proc.kmap[share.id], share.coords)
-			th = len(proc.kmap[share.id])	// should be the same for all items
+			th = len(proc.kmap[share.id]) // should be the same for all items
 		}
 		if th >= 2*proc.t {
 			proc.phase++
@@ -375,14 +375,14 @@ func (proc *dsaProc) ProcessResponse(data []byte, peer node.Node) ([]byte, error
 func formatDSA(r, s *big.Int, q *big.Int) []byte {
 	// returns the result in the raw format, not in DER
 	n := (q.BitLen() + 7) / 8
-	res := make([]byte, n*2)	// should be initialized with 0
+	res := make([]byte, n*2) // should be initialized with 0
 	rs := r.Bytes()
 	ss := s.Bytes()
 	if len(rs) > n || len(ss) > n {
 		panic("DSA: the size of the order > 160")
 	}
-	copy(res[n - len(rs):], rs)
-	copy(res[2*n - len(ss):], ss)
+	copy(res[n-len(rs):], rs)
+	copy(res[2*n-len(ss):], ss)
 	return res
 }
 
@@ -440,7 +440,7 @@ func parsePartialParam(ctx *dsaContext, data []byte) (group GroupOperations, sha
 		return
 	}
 	t = int(tt)
-	nodes, err = ctx.crypt.Certificate.ParseStream(r)	// read nodes from a stream
+	nodes, err = ctx.crypt.Certificate.ParseStream(r) // read nodes from a stream
 	return
 }
 
