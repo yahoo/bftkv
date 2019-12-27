@@ -4,11 +4,11 @@
 package ecdsa
 
 import (
-	"math/big"
 	"bytes"
 	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"encoding/binary"
+	"math/big"
 
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/sss"
@@ -20,7 +20,7 @@ type ecdsaGroup struct {
 }
 
 type ecdsaGroupOperations struct {
-	curve elliptic.Curve
+	curve  elliptic.Curve
 	params *elliptic.CurveParams
 }
 
@@ -39,7 +39,7 @@ func (g *ecdsaGroupOperations) CalculateR(rs []*dsa.PartialR) *big.Int {
 		xs = append(xs, ri.X)
 	}
 	var x, y *big.Int
-	v := big.NewInt(0)	// v = a*k mod q
+	v := big.NewInt(0) // v = a*k mod q
 	t := new(big.Int)
 	for _, ri := range rs {
 		l := sss.Lagrange(ri.X, xs, g.params.N)
@@ -48,7 +48,7 @@ func (g *ecdsaGroupOperations) CalculateR(rs []*dsa.PartialR) *big.Int {
 		if x == nil {
 			x, y = x1, y1
 		} else {
-			x, y = g.curve.Add(x, y, x1, y1)		// P += li*ai*P
+			x, y = g.curve.Add(x, y, x1, y1) // P += li*ai*P
 		}
 		t.Mod(t.Mul(ri.Vi, l), g.params.N)
 		v.Mod(v.Add(v, t), g.params.N)
@@ -119,5 +119,5 @@ func (g *ecdsaGroup) ParseParams(r *bytes.Reader) (group dsa.GroupOperations, er
 			}
 		}
 	}
-	return 
+	return
 }

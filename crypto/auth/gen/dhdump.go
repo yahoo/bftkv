@@ -4,13 +4,13 @@
 package main
 
 import (
-	"os"
 	"bufio"
-	"io/ioutil"
-	"fmt"
 	"encoding/asn1"
 	"encoding/pem"
+	"fmt"
+	"io/ioutil"
 	"math/big"
+	"os"
 )
 
 func main() {

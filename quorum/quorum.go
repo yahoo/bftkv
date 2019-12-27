@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	READ = 0x01
+	READ  = 0x01
 	WRITE = 0x02
-	AUTH = 0x04
-	CERT = 0x08
-	PEER = 0x10
+	AUTH  = 0x04
+	CERT  = 0x08
+	PEER  = 0x10
 )
 
 type Quorum interface {

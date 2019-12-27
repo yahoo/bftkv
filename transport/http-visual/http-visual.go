@@ -4,56 +4,55 @@
 package http_visual
 
 import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"strings"
+
+	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/node/graph"
 	"github.com/yahoo/bftkv/quorum"
-	"golang.org/x/net/websocket"
-	"net/http"
-	"log"
-	"github.com/yahoo/bftkv/crypto"
-	"fmt"
-	"encoding/json"
 	"github.com/yahoo/bftkv/transport"
 	transport_http "github.com/yahoo/bftkv/transport/http"
-	"strings"
+	"golang.org/x/net/websocket"
 )
 
 type TrHTTPVisual struct {
 	transport_http.TrHTTP
 	graph *graph.Graph
-	qs quorum.QuorumSystem
-	wss []*websocket.Conn
+	qs    quorum.QuorumSystem
+	wss   []*websocket.Conn
 }
 
 type Edge struct {
-	Source string
+	Source      string
 	Destination string
 }
 
 type VisualGraph struct {
-	Names map[uint64] string
-	Edges [] Edge
-	Revoked [] string
+	Names   map[uint64]string
+	Edges   []Edge
+	Revoked []string
 }
 
 type message struct {
 	Message string `json:"message"`
 }
 
-
 func New(security *crypto.Crypto, graph *graph.Graph, qs quorum.QuorumSystem, wsAddress string) transport.Transport {
 	h := transport_http.New(security)
 	hv := &TrHTTPVisual{*(h.(*transport_http.TrHTTP)), graph, qs, nil}
 	// create listener to send and receive data from js
-	http.Handle("/" + wsAddress, websocket.Handler(hv.HandleConnection))
+	http.Handle("/"+wsAddress, websocket.Handler(hv.HandleConnection))
 	go func() {
-		err := http.ListenAndServe(":" + wsAddress, nil)
+		err := http.ListenAndServe(":"+wsAddress, nil)
 		if err != nil {
 			log.Println("Websocket already open and serving.")
 		}
 	}()
-	return hv;
+	return hv
 }
-
 
 func (hVisual *TrHTTPVisual) HandleConnection(ws *websocket.Conn) {
 	log.Printf("Socket open: %s, %s ", ws.LocalAddr(), ws.RemoteAddr())
@@ -63,7 +62,7 @@ func (hVisual *TrHTTPVisual) HandleConnection(ws *websocket.Conn) {
 		hVisual.wss = append(hVisual.wss, ws)
 		var m message
 		if err := websocket.JSON.Receive(ws, &m); err != nil {
-			if (fmt.Sprint(err) == "EOF") {
+			if fmt.Sprint(err) == "EOF" {
 				log.Println("Socket connection terminated.")
 			}
 			break
@@ -72,38 +71,38 @@ func (hVisual *TrHTTPVisual) HandleConnection(ws *websocket.Conn) {
 		log.Printf("Received message: %s\n", m)
 
 		switch m.Message {
-			case "graph":
-				graphString := hVisual.graphToJSONString()
-				websocket.Message.Send(ws, graphString)
-			case "trustGraph":
-				graphString := hVisual.graphToJSONString()
-				websocket.Message.Send(ws, fmt.Sprintf("{\"actionType\": \"trustGraph\", \"graph\": %v}", graphString))
+		case "graph":
+			graphString := hVisual.graphToJSONString()
+			websocket.Message.Send(ws, graphString)
+		case "trustGraph":
+			graphString := hVisual.graphToJSONString()
+			websocket.Message.Send(ws, fmt.Sprintf("{\"actionType\": \"trustGraph\", \"graph\": %v}", graphString))
 		}
 	}
 
 }
 
 func (hVisual *TrHTTPVisual) graphToJSONString() string {
-	var edges [] Edge
-	names := make(map[uint64] string)
+	var edges []Edge
+	names := make(map[uint64]string)
 	for nodeId, node := range hVisual.graph.Vertices {
 		if node.Instance != nil {
 			names[node.Instance.Id()] = node.Instance.Name()
 		}
 		for destinationId, _ := range node.Edges {
-			edges = append(edges, Edge{fmt.Sprintf("%v", nodeId),fmt.Sprintf("%v", destinationId)})
+			edges = append(edges, Edge{fmt.Sprintf("%v", nodeId), fmt.Sprintf("%v", destinationId)})
 		}
 	}
 
-	var revokedList [] string
+	var revokedList []string
 
 	for id, node := range hVisual.graph.Revoked {
 		name := ""
 		if node != nil {
 			name = node.Name()
 		}
-		names[id] = name 	// add also nodes in the revoked list to names
-		revokedList = append(revokedList, fmt.Sprintf("%v", id))	// fill the revoked list with ids
+		names[id] = name                                         // add also nodes in the revoked list to names
+		revokedList = append(revokedList, fmt.Sprintf("%v", id)) // fill the revoked list with ids
 	}
 
 	vg := VisualGraph{names, edges, revokedList}
@@ -116,7 +115,6 @@ func (hVisual *TrHTTPVisual) graphToJSONString() string {
 	return string(k)
 }
 
-
 func (hv *TrHTTPVisual) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hv.TrHTTP.ServeHTTP(w, r)
 	path := strings.ToLower(r.URL.Path)
@@ -124,9 +122,9 @@ func (hv *TrHTTPVisual) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actionType := path[len(transport.Prefix):]
-	if (hv.wss != nil) {
+	if hv.wss != nil {
 		for _, ws := range hv.wss {
-			if (actionType == "read" || actionType == "sign" || actionType =="write" || actionType == "malwrite" || actionType == "malsign") {	// for now, just inform the graph on these
+			if actionType == "read" || actionType == "sign" || actionType == "write" || actionType == "malwrite" || actionType == "malsign" { // for now, just inform the graph on these
 				websocket.Message.Send(ws, fmt.Sprintf("{\"actionType\": \"%s\", \"to\": \"%s\"}", actionType, hv.graph.Name()))
 			} else if actionType == "notify" {
 				// decrypt the packet
@@ -138,7 +136,7 @@ func (hv *TrHTTPVisual) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// get the list of revoked nodes
-				nodes,  err := crypt.Certificate.Parse(req)
+				nodes, err := crypt.Certificate.Parse(req)
 
 				if err != nil {
 					log.Printf("server [%s]: certificate parse error: %s\n", hv.Server.Addr, err)
@@ -159,7 +157,7 @@ func (hv *TrHTTPVisual) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (hv *TrHTTPVisual) RevokeVisual(ids []uint64) {
 	for _, ws := range hv.wss {
 		for _, id := range ids {
-			websocket.Message.Send(ws, fmt.Sprintf("{\"actionType\": \"revoke\", \"id\": \"%v\"}", id));
+			websocket.Message.Send(ws, fmt.Sprintf("{\"actionType\": \"revoke\", \"id\": \"%v\"}", id))
 		}
 	}
 }
@@ -167,10 +165,9 @@ func (hv *TrHTTPVisual) RevokeVisual(ids []uint64) {
 // If visualization is active, ServeHTTP here
 func (hv *TrHTTPVisual) Start(o transport.TransportServer, addr string) {
 	hv.Server = &http.Server{
-		Addr: addr,
+		Addr:    addr,
 		Handler: hv,
 	}
 	hv.O = o
 	go hv.Server.ListenAndServe()
 }
-

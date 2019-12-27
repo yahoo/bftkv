@@ -4,42 +4,42 @@
 package api
 
 import (
-	"os"
 	gocrypto "crypto"
+	"os"
 
 	"github.com/yahoo/bftkv"
-	"github.com/yahoo/bftkv/protocol"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/pgp"
 	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/node/graph"
+	"github.com/yahoo/bftkv/packet"
+	"github.com/yahoo/bftkv/protocol"
 	"github.com/yahoo/bftkv/quorum"
 	"github.com/yahoo/bftkv/quorum/wotqs"
-	"github.com/yahoo/bftkv/packet"
 	"github.com/yahoo/bftkv/transport"
 	transport_http "github.com/yahoo/bftkv/transport/http"
 )
 
 type API struct {
-	path string
+	path   string
 	client *protocol.Client
-	g *graph.Graph
-	crypt *crypto.Crypto
-	qs quorum.QuorumSystem
-	tr transport.Transport
+	g      *graph.Graph
+	crypt  *crypto.Crypto
+	qs     quorum.QuorumSystem
+	tr     transport.Transport
 }
 
 func OpenClient(path string) (*API, error) {
 	api := &API{
-		path: path,
+		path:   path,
 		client: nil,
-		g: graph.New(),
-		crypt: pgp.New(),
+		g:      graph.New(),
+		crypt:  pgp.New(),
 	}
-	if _, err := api.readCerts(path + "/pubring.gpg", false, true); err != nil {
+	if _, err := api.readCerts(path+"/pubring.gpg", false, true); err != nil {
 		return nil, err
 	}
-	if _, err := api.readCerts(path + "/secring.gpg", true, true); err != nil {
+	if _, err := api.readCerts(path+"/secring.gpg", true, true); err != nil {
 		return nil, err
 	}
 
@@ -59,7 +59,7 @@ func (api *API) CloseClient() {
 
 func (api *API) signPeers(certs []string) error {
 	for _, cert := range certs {
-		if peers, err := api.readCerts(cert + "/pubring.gpg", false, false); err == nil {
+		if peers, err := api.readCerts(cert+"/pubring.gpg", false, false); err == nil {
 			// make an edge: self -> cert
 			if len(peers) > 0 {
 				if err := api.crypt.Certificate.Sign(peers[0]); err == nil {
@@ -77,7 +77,7 @@ func (api *API) Register(certs []string, password string) error {
 		return err
 	}
 	// read them into the graph
-	if err := api.client.Joining(); err != nil {	// re-joining so the client can construct the full graph
+	if err := api.client.Joining(); err != nil { // re-joining so the client can construct the full graph
 		return err
 	}
 	// need to re-sign as Joining has overwritten some nodes
@@ -95,7 +95,7 @@ func (api *API) Register(certs []string, password string) error {
 	}
 
 	// do "register" and get back signed certs
-	t := uint64(1)	// make sure it's no longer temporary
+	t := uint64(1) // make sure it's no longer temporary
 	cert, err := self.SerializeSelf()
 	if err != nil {
 		return err
@@ -108,7 +108,7 @@ func (api *API) Register(certs []string, password string) error {
 	if err != nil {
 		return err
 	}
-	pkt, err := packet.Serialize(variable, cert, t, sig, proof)	// use the value as the PGP cert
+	pkt, err := packet.Serialize(variable, cert, t, sig, proof) // use the value as the PGP cert
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (api *API) Register(certs []string, password string) error {
 				succ = append(succ, res.Peer)
 			}
 		}
-		return false	// collect signatures as many as possible
+		return false // collect signatures as many as possible
 	})
 
 	// accumulate all signatures into the self cert
@@ -186,7 +186,7 @@ func (api *API) Read(variable []byte, password string) (value []byte, err error)
 
 func (api *API) UpdateCert() error {
 	path := api.path + "/pubring.gpg"
-	err := os.Rename(path, path + "~")
+	err := os.Rename(path, path+"~")
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func (api *API) UpdateCert() error {
 	err = api.g.SerializeNodes(f)
 	f.Close()
 	if err != nil {
-		os.Rename(path + "~", path)
+		os.Rename(path+"~", path)
 	}
 	return err
 }

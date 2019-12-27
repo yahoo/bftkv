@@ -4,15 +4,15 @@
 package pgp
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/base64"
 	"io"
 	"io/ioutil"
-	"bytes"
-	"bufio"
-	"encoding/base64"
-	"time"
+	"log"
 	"regexp"
 	"strings"
-	"log"
+	"time"
 
 	"golang.org/x/crypto/openpgp"
 	pgp_packet "golang.org/x/crypto/openpgp/packet"
@@ -24,7 +24,6 @@ import (
 	"github.com/yahoo/bftkv/packet"
 	"github.com/yahoo/bftkv/quorum"
 )
-
 
 //
 // Certificate Instance
@@ -116,7 +115,7 @@ func (c *PGPCertificateInstance) Active() bool {
 type PGPKeyring struct {
 	keyring openpgp.EntityList
 	secring openpgp.EntityList
-	self openpgp.EntityList
+	self    openpgp.EntityList
 }
 
 func NewKeyring() crypto.Keyring {
@@ -149,7 +148,7 @@ func (k *PGPKeyring) Register(nodes []node.Node, priv bool, self bool) error {
 			if len(nodes) == 0 {
 				return crypto.ErrCertificateNotFound
 			}
-			k.self = replace(k.self, nodes[0:1])	// @@ the first one must be self
+			k.self = replace(k.self, nodes[0:1]) // @@ the first one must be self
 		}
 	}
 	return nil
@@ -225,7 +224,7 @@ func (k *PGPKeyring) getSelfCertificate() openpgp.EntityList {
 
 //
 // Certificate
-// 
+//
 type PGPCertificate struct {
 	keyring *PGPKeyring
 }
@@ -240,7 +239,7 @@ func (c *PGPCertificate) Parse(pkt []byte) ([]node.Node, error) {
 	packets := pgp_packet.NewReader(r)
 	var nodes []node.Node
 	for {
-		entity, err := openpgp.ReadEntity(packets);
+		entity, err := openpgp.ReadEntity(packets)
 		if err != nil {
 			break
 		}
@@ -281,7 +280,7 @@ func (c *PGPCertificate) Sign(signee node.Node) error {
 	id := ""
 	for i, _ := range e.Identities {
 		id = i
-		break	// use the first one
+		break // use the first one
 	}
 	if id == "" {
 		return crypto.ErrCertificateNotFound
@@ -310,7 +309,7 @@ func (c *PGPCertificate) Merge(target node.Node, sub node.Node) error {
 //
 type PGPSignature struct {
 	keyring *PGPKeyring
-	cert *PGPCertificate
+	cert    *PGPCertificate
 }
 
 func NewSignature(keyring crypto.Keyring, cert crypto.Certificate) crypto.Signature {
@@ -320,7 +319,7 @@ func NewSignature(keyring crypto.Keyring, cert crypto.Certificate) crypto.Signat
 func (s *PGPSignature) Verify(tbs []byte, sig *packet.SignaturePacket) error {
 	// go through all signatures
 	r := bytes.NewReader(sig.Data)
-	err := crypto.ErrInvalidSignature	// at least we need one valid signature
+	err := crypto.ErrInvalidSignature // at least we need one valid signature
 	for r.Len() > 0 {
 		_, err = openpgp.CheckDetachedSignature(s.keyring.getKeyring(), bytes.NewReader(tbs), r)
 		if err != nil {
@@ -334,7 +333,7 @@ func (s *PGPSignature) VerifyWithCertificate(tbs []byte, sig *packet.SignaturePa
 	keyring := openpgp.EntityList{cert.(*PGPCertificateInstance).entity}
 	// go through all signatures
 	r := bytes.NewReader(sig.Data)
-	err := crypto.ErrInvalidSignature	// at least we need one valid signature
+	err := crypto.ErrInvalidSignature // at least we need one valid signature
 	for r.Len() > 0 {
 		_, err = openpgp.CheckDetachedSignature(keyring, bytes.NewReader(tbs), r)
 		if err != nil {
@@ -363,11 +362,11 @@ func (s *PGPSignature) Sign(tbs []byte) (*packet.SignaturePacket, error) {
 	}
 	cert := w2.Bytes()
 	return &packet.SignaturePacket{
-		Type: packet.SignatureTypePGP,
-		Version: 0,
+		Type:      packet.SignatureTypePGP,
+		Version:   0,
 		Completed: false,
-		Data: sig,
-		Cert: cert,
+		Data:      sig,
+		Cert:      cert,
 	}, nil
 }
 
@@ -381,7 +380,7 @@ func (s *PGPSignature) Signers(sig *packet.SignaturePacket) []node.Node {
 		}
 		switch p := p.(type) {
 		case *pgp_packet.Signature:
-			e := s.keyring.getCertById(*p.IssuerKeyId)	// @@ we need to explicitly specify to use the primary key to sign <x, t, v>
+			e := s.keyring.getCertById(*p.IssuerKeyId) // @@ we need to explicitly specify to use the primary key to sign <x, t, v>
 			if e != nil {
 				nodes = append(nodes, newNode(e))
 			}
@@ -402,9 +401,8 @@ func (s *PGPSignature) Issuer(sig *packet.SignaturePacket) node.Node {
 	if err != nil || len(nodes) == 0 {
 		return nil
 	}
-	return nodes[0]		// has to be the first one
+	return nodes[0] // has to be the first one
 }
-
 
 //
 // message stream
@@ -457,7 +455,7 @@ func (msg *PGPMessage) Decrypt(body io.Reader) (plain []byte, nonce []byte, peer
 	if err != nil {
 		return nil, nil, nil, crypto.ErrDecryptionFailed
 	}
-	if !(m.IsEncrypted && m.IsSigned) {	// m.IsSignedBy might be nil in the case we haven't had the signer's key in the keyring yet
+	if !(m.IsEncrypted && m.IsSigned) { // m.IsSignedBy might be nil in the case we haven't had the signer's key in the keyring yet
 		return nil, nil, nil, crypto.ErrInvalidTransportSecurityData
 	}
 	plain, err = ioutil.ReadAll(m.UnverifiedBody)
@@ -468,10 +466,9 @@ func (msg *PGPMessage) Decrypt(body io.Reader) (plain []byte, nonce []byte, peer
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	peer = msg.keyring.GetCertById(m.SignedByKeyId)	// peer might be nil
-	return plain, nonce, peer, m.SignatureError	// @@ need to confirm SignedByKeyId is always the primary key ID regardless of what sub key is used
+	peer = msg.keyring.GetCertById(m.SignedByKeyId) // peer might be nil
+	return plain, nonce, peer, m.SignatureError     // @@ need to confirm SignedByKeyId is always the primary key ID regardless of what sub key is used
 }
-
 
 //
 // simple collective signature

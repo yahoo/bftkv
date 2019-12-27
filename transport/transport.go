@@ -4,8 +4,8 @@
 package transport
 
 import (
-	"io"
 	"bytes"
+	"io"
 
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/node"
@@ -35,16 +35,16 @@ const (
 const Prefix = "/bftkv/v1/"
 
 var (
-	ErrTransportSecurity = bftkv.NewError("transport: transport security error")
+	ErrTransportSecurity      = bftkv.NewError("transport: transport security error")
 	ErrTransportNonceMismatch = bftkv.NewError("transport: nonce mismatch")
-	ErrServerError = bftkv.NewError("transport: server error")
-	ErrNoAddress = bftkv.NewError("transport: no address")
+	ErrServerError            = bftkv.NewError("transport: server error")
+	ErrNoAddress              = bftkv.NewError("transport: no address")
 )
 
 type MulticastResponse struct {
 	Peer node.Node
 	Data []byte
-	Err error
+	Err  error
 }
 
 type TransportServer interface {
@@ -94,14 +94,14 @@ func Multicast(tr Transport, path int, peers []node.Node, mdata [][]byte, cb fun
 	case Notify:
 		cmd = "notify"
 	}
-	ch := make(chan(*MulticastResponse), len(peers))
+	ch := make(chan (*MulticastResponse), len(peers))
 	var cipher []byte
 	var nonce []byte
 	var err error
-	for i, peer := range(peers) {
+	for i, peer := range peers {
 		if i < len(mdata) {
 			nonce = tr.GenerateRandom()
-			cipher, err = tr.Encrypt(peers[i : i+len(peers)-len(mdata)+1], mdata[i], nonce)
+			cipher, err = tr.Encrypt(peers[i:i+len(peers)-len(mdata)+1], mdata[i], nonce)
 			if err != nil {
 				ch <- &MulticastResponse{peer, nil, err}
 				continue
@@ -113,7 +113,7 @@ func Multicast(tr Transport, path int, peers []node.Node, mdata [][]byte, cb fun
 				return
 			}
 			var plain []byte
-			r, err := tr.Post(peer.Address() + Prefix + cmd, bytes.NewReader(cipher))
+			r, err := tr.Post(peer.Address()+Prefix+cmd, bytes.NewReader(cipher))
 			if err == nil {
 				var t []byte
 				plain, t, _, err = tr.Decrypt(r)
@@ -123,14 +123,14 @@ func Multicast(tr Transport, path int, peers []node.Node, mdata [][]byte, cb fun
 					plain = nil
 				}
 			}
-			ch <- &MulticastResponse{peer, plain, err}	// Node is always available
+			ch <- &MulticastResponse{peer, plain, err} // Node is always available
 		}(peer, cipher, nonce)
 	}
 	for i := 0; i < len(peers); i++ {
-		mr := <- ch
+		mr := <-ch
 		if cb != nil {
 			if cb(mr) {
-				break	// should cancel the remaining Post requests?
+				break // should cancel the remaining Post requests?
 			}
 		}
 	}

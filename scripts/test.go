@@ -4,22 +4,21 @@
 package main
 
 import (
-	"os"
+	"bytes"
 	"flag"
 	"log"
-	"bytes"
+	"os"
 	"strconv"
 
-	"github.com/yahoo/bftkv/protocol"
-	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/pgp"
+	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/node/graph"
-        "github.com/yahoo/bftkv/quorum/wotqs"
-        "github.com/yahoo/bftkv/transport"
-        transport_http "github.com/yahoo/bftkv/transport/http"
+	"github.com/yahoo/bftkv/protocol"
+	"github.com/yahoo/bftkv/quorum/wotqs"
+	"github.com/yahoo/bftkv/transport"
+	transport_http "github.com/yahoo/bftkv/transport/http"
 )
-
 
 func main() {
 	defaultPath := os.Getenv("HOME") + "/.gnupg/"
@@ -43,11 +42,11 @@ func main() {
 		for ; m > 0; m-- {
 			if !*readonlyp {
 				value = []byte("value" + strconv.Itoa(m))
-				if err := c.Write(key, value); err != nil {
+				if err := c.Write(key, value, nil); err != nil {
 					log.Fatal(err)
 				}
 			}
-			res, err := c.Read(key)
+			res, err := c.Read(key, nil)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -61,8 +60,8 @@ func main() {
 func newClient(path string) *protocol.Client {
 	crypt := pgp.New()
 	g := graph.New()
-	readCerts(g, crypt, path + "/pubring.gpg", false)
-	readCerts(g, crypt, path + "/secring.gpg", true)
+	readCerts(g, crypt, path+"/pubring.gpg", false)
+	readCerts(g, crypt, path+"/secring.gpg", true)
 	qs := wotqs.New(g)
 	var tr transport.Transport
 	tr = transport_http.New(crypt)

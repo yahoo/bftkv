@@ -4,40 +4,38 @@
 package rsa
 
 import (
-	"math/big"
-	gocrypto "crypto"
-	gorsa "crypto/rsa"
-	"crypto/rand"
 	"bytes"
+	gocrypto "crypto"
+	"crypto/rand"
+	gorsa "crypto/rsa"
 	"encoding/binary"
+	"math/big"
 
-	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/crypto"
+	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/packet"
-
-//	"fmt"
+	//	"fmt"
 )
 
 type partialParam struct {
 	keys map[uint32]*big.Int
-	N *big.Int
-	id uint32
-	n int
+	N    *big.Int
+	id   uint32
+	n    int
 }
-
 
 //
 // client API
 //
 type rsaContext struct {
 	crypt *crypto.Crypto
-	n, k int
+	n, k  int
 	nodes []node.Node
 }
 
 type paramTree struct {
-	idx uint32
-	di *big.Int
+	idx      uint32
+	di       *big.Int
 	children map[uint32]*paramTree
 }
 
@@ -61,9 +59,9 @@ func (ctx *rsaContext) Distribute(key interface{}, nodes []node.Node, k int) (sh
 		collectKeys(kt, uint32(i), keys)
 		params := &partialParam{
 			keys: keys,
-			N: priv.N,
-			id: uint32(i),
-			n: ctx.n,
+			N:    priv.N,
+			id:   uint32(i),
+			n:    ctx.n,
 		}
 		secret, err := serializePartialParam(params)
 		if err != nil {
@@ -76,17 +74,17 @@ func (ctx *rsaContext) Distribute(key interface{}, nodes []node.Node, k int) (sh
 
 func makeKeyTree(key *big.Int, idx uint32, n, k int) (*paramTree, error) {
 	d := depth(idx, n)
-	if d > n - k {
+	if d > n-k {
 		return &paramTree{idx, key, nil}, nil
 	}
-	di, err := splitKey(key, n - d)
+	di, err := splitKey(key, n-d)
 	if err != nil {
 		return nil, err
 	}
 	tr := &paramTree{idx, key, make(map[uint32]*paramTree)}
 	for i, j := 0, 0; i < n; i++ {
 		if !inPath(uint32(i), idx, n) {
-			c, err := makeKeyTree(di[j], idx * uint32(n) + uint32(i) + 1, n, k)
+			c, err := makeKeyTree(di[j], idx*uint32(n)+uint32(i)+1, n, k)
 			if err != nil {
 				return nil, err
 			}
@@ -98,10 +96,10 @@ func makeKeyTree(key *big.Int, idx uint32, n, k int) (*paramTree, error) {
 }
 
 func splitKey(d *big.Int, n int) ([]*big.Int, error) {
-	max := new(big.Int).Lsh(big.NewInt(1), uint(d.BitLen() * 2))
+	max := new(big.Int).Lsh(big.NewInt(1), uint(d.BitLen()*2))
 	di := make([]*big.Int, n)
 	sum := new(big.Int)
-	for i := 0; i < n - 1; i++ {
+	for i := 0; i < n-1; i++ {
 		x, err := rand.Int(rand.Reader, max)
 		if err != nil {
 			return nil, err
@@ -114,7 +112,7 @@ func splitKey(d *big.Int, n int) ([]*big.Int, error) {
 		di[i] = x
 		sum.Add(sum, x)
 	}
-	di[n - 1] = new(big.Int).Sub(d, sum)
+	di[n-1] = new(big.Int).Sub(d, sum)
 	return di, nil
 }
 
@@ -169,7 +167,7 @@ func (ctx *rsaContext) Sign(sec []byte, req []byte, peerId, selfId uint64) ([]by
 			} else {
 				ci.Exp(m, di, params.N)
 			}
-			sigs[kid * uint32(params.n) + params.id + 1] = ci
+			sigs[kid*uint32(params.n)+params.id+1] = ci
 		}
 	}
 	if len(sigs) == 0 {
@@ -179,28 +177,27 @@ func (ctx *rsaContext) Sign(sec []byte, req []byte, peerId, selfId uint64) ([]by
 	}
 }
 
-
-// 
+//
 // client process
 //
 type sigTree struct {
-	idx uint32
-	psig *big.Int
+	idx       uint32
+	psig      *big.Int
 	completed bool
-	children map[uint32]*sigTree
+	children  map[uint32]*sigTree
 }
 
 type rsaProc struct {
 	nodes []node.Node
-	n, k int
-	tree *sigTree
-	sig []byte
+	n, k  int
+	tree  *sigTree
+	sig   []byte
 	hinfo []byte
 }
 
 type hashInfo struct {
 	prefix []byte
-	dgst []byte
+	dgst   []byte
 }
 
 func (ctx *rsaContext) NewProcess(tbs []byte, algo crypto.ThresholdAlgo, hash gocrypto.Hash) (crypto.ThresholdProcess, error) {
@@ -211,9 +208,9 @@ func (ctx *rsaContext) NewProcess(tbs []byte, algo crypto.ThresholdAlgo, hash go
 	}
 	return &rsaProc{
 		nodes: ctx.nodes,
-		n: ctx.n,
-		k: ctx.k,
-		tree: &sigTree{0, nil, false, nil},
+		n:     ctx.n,
+		k:     ctx.k,
+		tree:  &sigTree{0, nil, false, nil},
 		hinfo: hinfo,
 	}, nil
 }
@@ -232,7 +229,7 @@ func (p *rsaProc) MakeRequest() ([]node.Node, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return p.nodes, encoded, nil	// always try to broadcast to all nodes in case some inactive nodes might have been back online
+	return p.nodes, encoded, nil // always try to broadcast to all nodes in case some inactive nodes might have been back online
 }
 
 func (p *rsaProc) ProcessResponse(data []byte, peer node.Node) ([]byte, error) {
@@ -247,17 +244,17 @@ func (p *rsaProc) ProcessResponse(data []byte, peer node.Node) ([]byte, error) {
 	for idx, s := range sigs {
 		registerPartialSignature(p.tree, idx, s, depth(idx, p.n), p.n)
 	}
-	if p.tree.completed {	// we got all keys!
+	if p.tree.completed { // we got all keys!
 		s := big.NewInt(1)
 		calculateSignature(p.tree, s, N)
-		p.sig = I2OS(s, (N.BitLen() + 7) / 8)
+		p.sig = I2OS(s, (N.BitLen()+7)/8)
 	}
 	return p.sig, nil
 }
 
 func inPath(i uint32, path uint32, n int) bool {
 	for ; path != 0; path = (path - 1) / uint32(n) {
-		if i == (path - 1) % uint32(n) {
+		if i == (path-1)%uint32(n) {
 			return true
 		}
 	}
@@ -271,8 +268,8 @@ func missingKeys(st *sigTree, keys []uint32, n, k int) []uint32 {
 	if st.children == nil || len(st.children) == 0 {
 		keys = append(keys, st.idx)
 	} else {
-		if depth(st.idx, n) >= n - k {
-			// too deep... 
+		if depth(st.idx, n) >= n-k {
+			// too deep...
 			return keys
 		}
 		for i := 0; i < n; i++ {
@@ -281,7 +278,7 @@ func missingKeys(st *sigTree, keys []uint32, n, k int) []uint32 {
 			}
 			c, ok := st.children[uint32(i)]
 			if !ok {
-				keys = append(keys, st.idx * uint32(n) + uint32(i) + 1)
+				keys = append(keys, st.idx*uint32(n)+uint32(i)+1)
 			} else if !c.completed {
 				keys = missingKeys(c, keys, n, k)
 			}
@@ -291,8 +288,8 @@ func missingKeys(st *sigTree, keys []uint32, n, k int) []uint32 {
 }
 
 func registerPartialSignature(st *sigTree, idx uint32, psig *big.Int, d int, n int) {
-	self := idx	// idx never be 0
-	for j := 0; j < d - 1; j++ {
+	self := idx // idx never be 0
+	for j := 0; j < d-1; j++ {
 		self = (self - 1) / uint32(n)
 	}
 	i := (self - 1) % uint32(n)
@@ -309,11 +306,11 @@ func registerPartialSignature(st *sigTree, idx uint32, psig *big.Int, d int, n i
 		st.children[i] = c
 	}
 	if d > 1 {
-		registerPartialSignature(c, idx, psig, d - 1, n)
+		registerPartialSignature(c, idx, psig, d-1, n)
 	}
 
 	// check if we got partial sigs from all children
-	if len(st.children) >= n - depth(st.idx, n) {
+	if len(st.children) >= n-depth(st.idx, n) {
 		st.completed = completed(st)
 	}
 }
@@ -338,8 +335,7 @@ func completed(st *sigTree) bool {
 		}
 	}
 	return true
-}	
-
+}
 
 //
 // marshaling
@@ -347,16 +343,16 @@ func completed(st *sigTree) bool {
 
 // copied from https://golang.org/src/crypto/rsa/pkcs1v15.go
 var hashPrefixes = map[gocrypto.Hash][]byte{
-  	gocrypto.MD5:       {0x30, 0x20, 0x30, 0x0c, 0x06, 0x08, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x05, 0x05, 0x00, 0x04, 0x10},
-  	gocrypto.SHA1:      {0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14},
-  	gocrypto.SHA224:    {0x30, 0x2d, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04, 0x05, 0x00, 0x04, 0x1c},
-  	gocrypto.SHA256:    {0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20},
-  	gocrypto.SHA384:    {0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05, 0x00, 0x04, 0x30},
-  	gocrypto.SHA512:    {0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0x04, 0x40},
-  	gocrypto.MD5SHA1:   {}, // A special TLS case which doesn't use an ASN1 prefix.
-  	gocrypto.RIPEMD160: {0x30, 0x20, 0x30, 0x08, 0x06, 0x06, 0x28, 0xcf, 0x06, 0x03, 0x00, 0x31, 0x04, 0x14},
+	gocrypto.MD5:       {0x30, 0x20, 0x30, 0x0c, 0x06, 0x08, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x05, 0x05, 0x00, 0x04, 0x10},
+	gocrypto.SHA1:      {0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14},
+	gocrypto.SHA224:    {0x30, 0x2d, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04, 0x05, 0x00, 0x04, 0x1c},
+	gocrypto.SHA256:    {0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20},
+	gocrypto.SHA384:    {0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05, 0x00, 0x04, 0x30},
+	gocrypto.SHA512:    {0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0x04, 0x40},
+	gocrypto.MD5SHA1:   {}, // A special TLS case which doesn't use an ASN1 prefix.
+	gocrypto.RIPEMD160: {0x30, 0x20, 0x30, 0x08, 0x06, 0x06, 0x28, 0xcf, 0x06, 0x03, 0x00, 0x31, 0x04, 0x14},
 }
-  
+
 func emsaEncode(hinfo *hashInfo, N *big.Int) (*big.Int, error) {
 	emlen := (N.BitLen() + 7) / 8
 	mlen := len(hinfo.prefix) + len(hinfo.dgst)
@@ -366,13 +362,17 @@ func emsaEncode(hinfo *hashInfo, N *big.Int) (*big.Int, error) {
 	}
 	em := make([]byte, emlen)
 	i := 0
-	em[i] = 0x00; i++	// make the em size the same as modulus size
-	em[i] = 0x01; i++
-	for ; i < padlen - 1; i++ {
+	em[i] = 0x00
+	i++ // make the em size the same as modulus size
+	em[i] = 0x01
+	i++
+	for ; i < padlen-1; i++ {
 		em[i] = 0xff
 	}
-	em[i] = 0x00; i++
-	copy(em[i:], hinfo.prefix); i += len(hinfo.prefix)
+	em[i] = 0x00
+	i++
+	copy(em[i:], hinfo.prefix)
+	i += len(hinfo.prefix)
 	copy(em[i:], hinfo.dgst)
 	return OS2I(em), nil
 }
@@ -385,7 +385,7 @@ func I2OS(b *big.Int, sz int) []byte {
 	// prepend 0
 	ret := make([]byte, sz)
 	i := 0
-	for ; i < sz - len(c); i++ {
+	for ; i < sz-len(c); i++ {
 		ret[i] = 0
 	}
 	copy(ret[i:], c)
@@ -554,7 +554,7 @@ func parseHashInfo(data []byte) (*hashInfo, error) {
 	}
 	return &hashInfo{
 		prefix: prefix,
-		dgst: h,
+		dgst:   h,
 	}, nil
 }
 

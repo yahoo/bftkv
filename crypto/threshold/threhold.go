@@ -5,27 +5,27 @@ package threshold
 
 import (
 	gocrypto "crypto"
-	gorsa "crypto/rsa"
 	godsa "crypto/dsa"
 	goecdsa "crypto/ecdsa"
+	gorsa "crypto/rsa"
 
 	"github.com/yahoo/bftkv/crypto"
-	"github.com/yahoo/bftkv/crypto/threshold/rsa"
 	"github.com/yahoo/bftkv/crypto/threshold/dsa"
 	"github.com/yahoo/bftkv/crypto/threshold/ecdsa"
+	"github.com/yahoo/bftkv/crypto/threshold/rsa"
 	"github.com/yahoo/bftkv/node"
 )
 
 type ThresholdInstance struct {
-	rsa crypto.Threshold
-	dsa crypto.Threshold
+	rsa   crypto.Threshold
+	dsa   crypto.Threshold
 	ecdsa crypto.Threshold
 }
 
 func New(crypt *crypto.Crypto) crypto.Threshold {
 	return &ThresholdInstance{
-		rsa: rsa.New(crypt),
-		dsa: dsa.New(crypt),
+		rsa:   rsa.New(crypt),
+		dsa:   dsa.New(crypt),
 		ecdsa: ecdsa.New(crypt),
 	}
 }
@@ -81,7 +81,7 @@ func ParseParams(aux []byte) (algo crypto.ThresholdAlgo, data []byte) {
 }
 
 func SerializeParams(algo crypto.ThresholdAlgo, data []byte) []byte {
-	aux := make([]byte, len(data) + 1)
+	aux := make([]byte, len(data)+1)
 	aux[0] = byte(algo)
 	copy(aux[1:], data)
 	return aux

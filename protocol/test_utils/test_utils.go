@@ -4,38 +4,38 @@
 package test_utils
 
 import (
-        "os"
-	"log"
-        "strings"
-	"testing"
 	"io/ioutil"
+	"log"
+	"os"
+	"strings"
+	"testing"
 
-	"github.com/yahoo/bftkv/protocol"
-	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/pgp"
+	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/node/graph"
-        "github.com/yahoo/bftkv/quorum/wotqs"
-        storage_plain "github.com/yahoo/bftkv/storage/plain"
-        "github.com/yahoo/bftkv/transport"
-        transport_http "github.com/yahoo/bftkv/transport/http"
+	"github.com/yahoo/bftkv/protocol"
+	"github.com/yahoo/bftkv/quorum/wotqs"
+	storage_plain "github.com/yahoo/bftkv/storage/plain"
+	"github.com/yahoo/bftkv/transport"
+	transport_http "github.com/yahoo/bftkv/transport/http"
 )
 
 const (
-	scriptPath = "../scripts"	// any way to specify the absolute path?
-	KeyPath = scriptPath + "/run/keys"	
+	scriptPath      = "../scripts" // any way to specify the absolute path?
+	KeyPath         = scriptPath + "/run/keys"
 	serverKeyPrefix = "a"
-	ClientKey = "u01"
-	dbPrefix = scriptPath + "/run/db."
-	testKey = "test"
-	testValue = "test"
+	ClientKey       = "u01"
+	dbPrefix        = scriptPath + "/run/db."
+	testKey         = "test"
+	testValue       = "test"
 )
 
 func NewServer(path string, dbPath string) *protocol.Server {
 	crypt := pgp.New()
 	g := graph.New()
-	readCerts(g, crypt, path + "/pubring.gpg", false)
-	readCerts(g, crypt, path + "/secring.gpg", true)
+	readCerts(g, crypt, path+"/pubring.gpg", false)
+	readCerts(g, crypt, path+"/secring.gpg", true)
 	qs := wotqs.New(g)
 	var tr transport.Transport
 	tr = transport_http.New(crypt)
@@ -46,8 +46,8 @@ func NewServer(path string, dbPath string) *protocol.Server {
 func NewClient(path string) *protocol.Client {
 	crypt := pgp.New()
 	g := graph.New()
-	readCerts(g, crypt, path + "/pubring.gpg", false)
-	readCerts(g, crypt, path + "/secring.gpg", true)
+	readCerts(g, crypt, path+"/pubring.gpg", false)
+	readCerts(g, crypt, path+"/secring.gpg", true)
 	qs := wotqs.New(g)
 	var tr transport.Transport
 	tr = transport_http.New(crypt)

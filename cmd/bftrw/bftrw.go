@@ -4,31 +4,30 @@
 package main
 
 import (
+	gocrypto "crypto"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/asn1"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/pem"
+	"errors"
 	"flag"
-	"os"
-        "strings"
 	"fmt"
 	"io/ioutil"
-	"encoding/pem"
-	"encoding/asn1"
-	"encoding/hex"
-	"encoding/base64"
-	gocrypto "crypto"
-	"crypto/x509"
-	"crypto/rand"
-	"errors"
+	"os"
+	"strings"
 
 	"github.com/yahoo/bftkv/api"
 	"github.com/yahoo/bftkv/crypto"
 )
 
 const (
-	authNameLen = 16
+	authNameLen   = 16
 	authSecretLen = 32
 )
 
 var prefixes = []string{"a", "rw"}
-
 
 func main() {
 	keyp := flag.String("key", "key", "path to the self key directory")
@@ -58,7 +57,7 @@ func main() {
 		flag.Usage()
 		return
 	}
-	switch (av[0]) {
+	switch av[0] {
 	case "register":
 		err := register(client, path, pass)
 		if err != nil {
@@ -79,13 +78,13 @@ func main() {
 			}
 		}
 	case "write":
-		for i := 1; i + 1 < ac; i += 2 {
+		for i := 1; i+1 < ac; i += 2 {
 			key, err := toKey(av[i], *hexp)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 				break
 			}
-			val, err := toVal(av[i + 1], *b64p)
+			val, err := toVal(av[i+1], *b64p)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 				break
@@ -147,7 +146,7 @@ func main() {
 			name := av[i]
 			if name[0] == '@' {
 				auth, err = ioutil.ReadFile(name[1:])
-			} else {	// doesn't make sense to specify the auth data as binary
+			} else { // doesn't make sense to specify the auth data as binary
 				auth, err = hex.DecodeString(name)
 			}
 			if err != nil {
@@ -175,7 +174,7 @@ func register(client *api.API, path string, pass string) error {
 	for _, f := range files {
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(f.Name(), prefix) {
-				certs = append(certs, path + "/" + f.Name())
+				certs = append(certs, path+"/"+f.Name())
 			}
 		}
 	}
@@ -199,7 +198,7 @@ func ca(client *api.API, caname string, path string) error {
 			return errors.New("not a PKCS8")
 		}
 		der = block.Bytes
-	} else {	// not PEM, assume the data is DER
+	} else { // not PEM, assume the data is DER
 		der = data
 	}
 	key, err := x509.ParsePKCS8PrivateKey(der)
@@ -210,9 +209,9 @@ func ca(client *api.API, caname string, path string) error {
 }
 
 type certificate struct {
-  	TBSCertificate     asn1.RawValue
-  	SignatureAlgorithm asn1.RawValue
-  	SignatureValue     asn1.BitString
+	TBSCertificate     asn1.RawValue
+	SignatureAlgorithm asn1.RawValue
+	SignatureValue     asn1.BitString
 }
 
 func sign(client *api.API, caname string, path string) error {
@@ -230,7 +229,7 @@ func sign(client *api.API, caname string, path string) error {
 	} else {
 		der = data
 	}
-	crt, err := x509.ParseCertificate(der)	// template
+	crt, err := x509.ParseCertificate(der) // template
 	if err != nil {
 		return err
 	}
@@ -296,14 +295,14 @@ func sign(client *api.API, caname string, path string) error {
 		return err
 	}
 	return pem.Encode(os.Stdout, &pem.Block{
-		Type: "CERTIFICATE",
+		Type:    "CERTIFICATE",
 		Headers: nil,
-		Bytes: der,
+		Bytes:   der,
 	})
 }
 
 func kms(client *api.API, secret []byte) ([]byte, error) {
-	auth := make([]byte, authNameLen + authSecretLen)
+	auth := make([]byte, authNameLen+authSecretLen)
 	if _, err := rand.Read(auth); err != nil {
 		return nil, err
 	}

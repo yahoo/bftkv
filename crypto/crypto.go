@@ -4,32 +4,32 @@
 package crypto
 
 import (
-	"io"
 	gocrypto "crypto"
+	"io"
 
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/node"
-	"github.com/yahoo/bftkv/quorum"
 	"github.com/yahoo/bftkv/packet"
+	"github.com/yahoo/bftkv/quorum"
 )
 
 var (
-	ErrCertificateNotFound = bftkv.NewError("crypto: certifiate not found")
-	ErrKeyNotFound = bftkv.NewError("crypto: key not found")
-	ErrInvalidTransportSecurityData = bftkv.NewError("crypto: invalid transport security data")
-	ErrInsufficientNumberOfSignatures = bftkv.NewError("crypto: insufficient number of signatures")
-	ErrInvalidSignature = bftkv.NewError("crypto: invalid signature")
-	ErrSigningFailed = bftkv.NewError("crypto: failed to sign")
-	ErrEncryptionFailed = bftkv.NewError("crypto: failed to encrypt")
-	ErrDecryptionFailed = bftkv.NewError("crypto: failed to decrypt")
-	ErrInsufficientNumberOfSecrets = bftkv.NewError("crypto: insufficient number of secrets")
-	ErrInvalidInput = bftkv.NewError("crypto: invalid input")
-	ErrNoAuthenticationData = bftkv.NewError("crypto: no authentication data")
-	ErrAuthTooManyAttempts = bftkv.NewError("crypto: too many attempts")
-	ErrUnsupported = bftkv.NewError("crypto: unsupported algorithm")
+	ErrCertificateNotFound                     = bftkv.NewError("crypto: certifiate not found")
+	ErrKeyNotFound                             = bftkv.NewError("crypto: key not found")
+	ErrInvalidTransportSecurityData            = bftkv.NewError("crypto: invalid transport security data")
+	ErrInsufficientNumberOfSignatures          = bftkv.NewError("crypto: insufficient number of signatures")
+	ErrInvalidSignature                        = bftkv.NewError("crypto: invalid signature")
+	ErrSigningFailed                           = bftkv.NewError("crypto: failed to sign")
+	ErrEncryptionFailed                        = bftkv.NewError("crypto: failed to encrypt")
+	ErrDecryptionFailed                        = bftkv.NewError("crypto: failed to decrypt")
+	ErrInsufficientNumberOfSecrets             = bftkv.NewError("crypto: insufficient number of secrets")
+	ErrInvalidInput                            = bftkv.NewError("crypto: invalid input")
+	ErrNoAuthenticationData                    = bftkv.NewError("crypto: no authentication data")
+	ErrAuthTooManyAttempts                     = bftkv.NewError("crypto: too many attempts")
+	ErrUnsupported                             = bftkv.NewError("crypto: unsupported algorithm")
 	ErrInsufficientNumberOfThresholdSignatures = bftkv.NewError("crypto: insufficient number of threshold signatures")
-	ErrShareNotFound = bftkv.NewError("crypto: share not found")
-	ErrContinue = bftkv.NewError("crypto: continue")	// not an error but to tell the client the threshold process continues
+	ErrShareNotFound                           = bftkv.NewError("crypto: share not found")
+	ErrContinue                                = bftkv.NewError("crypto: continue") // not an error but to tell the client the threshold process continues
 )
 
 type Keyring interface {
@@ -52,7 +52,7 @@ type Signature interface {
 	Verify(tbs []byte, sig *packet.SignaturePacket) error
 	VerifyWithCertificate(tbs []byte, sig *packet.SignaturePacket, cert node.Node) error
 	Sign(tbs []byte) (*packet.SignaturePacket, error)
-	Signers(sig *packet.SignaturePacket) []node.Node		// return only nodes that have been verified
+	Signers(sig *packet.SignaturePacket) []node.Node // return only nodes that have been verified
 	Issuer(sig *packet.SignaturePacket) node.Node
 	Certs(sig *packet.SignaturePacket) ([]node.Node, error)
 }
@@ -81,6 +81,7 @@ type RNG interface {
 }
 
 type ThresholdAlgo byte
+
 const (
 	TH_UNKNOWN ThresholdAlgo = iota
 	TH_RSA
@@ -100,11 +101,11 @@ type ThresholdProcess interface {
 }
 
 type Crypto struct {
-	Keyring Keyring
-	Certificate Certificate
-	Signature Signature
-	Message Message
+	Keyring             Keyring
+	Certificate         Certificate
+	Signature           Signature
+	Message             Message
 	CollectiveSignature CollectiveSignature
-	DataEncryption DataEncryption
-	RNG RNG
+	DataEncryption      DataEncryption
+	RNG                 RNG
 }

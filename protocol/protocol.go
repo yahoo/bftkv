@@ -11,10 +11,10 @@ import (
 )
 
 type Protocol struct {
-	self node.SelfNode
-	qs quorum.QuorumSystem
-	tr transport.Transport
-	crypt *crypto.Crypto
+	self      node.SelfNode
+	qs        quorum.QuorumSystem
+	tr        transport.Transport
+	crypt     *crypto.Crypto
 	threshold crypto.Threshold
 }
 
@@ -36,7 +36,7 @@ func (p *Protocol) Joining() error {
 			break
 		}
 		p.tr.Multicast(transport.Join, peers, pkt, func(res *transport.MulticastResponse) bool {
-			if res.Data != nil {	// ignore res.Err as it might be bacause the peer certificate hasn't been registered yet
+			if res.Data != nil { // ignore res.Err as it might be bacause the peer certificate hasn't been registered yet
 				nodes, err := p.crypt.Certificate.Parse(res.Data)
 				if err == nil {
 					nodes = p.self.AddPeers(nodes)
@@ -45,7 +45,7 @@ func (p *Protocol) Joining() error {
 					}
 				}
 			}
-			return false	// go through all nodes
+			return false // go through all nodes
 		})
 	}
 	return nil

@@ -4,31 +4,31 @@
 package http
 
 import (
+	"context"
 	"io"
+	"log"
 	"net"
 	"net/http"
-	"time"
-	"context"
 	"strings"
-	"log"
+	"time"
 
 	"github.com/yahoo/bftkv"
-	"github.com/yahoo/bftkv/transport"
-	"github.com/yahoo/bftkv/node"
 	"github.com/yahoo/bftkv/crypto"
+	"github.com/yahoo/bftkv/node"
+	"github.com/yahoo/bftkv/transport"
 )
 
 type TrHTTP struct {
-	client *http.Client
-	Server *http.Server
-	O transport.TransportServer
+	client   *http.Client
+	Server   *http.Server
+	O        transport.TransportServer
 	security *crypto.Crypto
 }
 
 const (
-	NonceSize = 8
-	DIAL_TIMEOUT = 5
-	IDLE_TIMEOUT = 10
+	NonceSize        = 8
+	DIAL_TIMEOUT     = 5
+	IDLE_TIMEOUT     = 10
 	RESPONSE_TIMEOUT = 10
 )
 
@@ -38,10 +38,10 @@ func New(security *crypto.Crypto) transport.Transport {
 	// client
 	tr := &http.Transport{
 		Dial: func(network, addr string) (net.Conn, error) {
-			return net.DialTimeout(network, addr, time.Duration(DIAL_TIMEOUT) * time.Second)
+			return net.DialTimeout(network, addr, time.Duration(DIAL_TIMEOUT)*time.Second)
 		},
-		MaxIdleConns: 1,	// for testing -- running multiple servers in one process process may exceeds the limit of #sockets
-		IdleConnTimeout: time.Duration(IDLE_TIMEOUT) * time.Second,
+		MaxIdleConns:          1, // for testing -- running multiple servers in one process process may exceeds the limit of #sockets
+		IdleConnTimeout:       time.Duration(IDLE_TIMEOUT) * time.Second,
 		ResponseHeaderTimeout: time.Duration(RESPONSE_TIMEOUT) * time.Second,
 	}
 	h.client = &http.Client{
@@ -49,7 +49,6 @@ func New(security *crypto.Crypto) transport.Transport {
 	}
 	return h
 }
-
 
 func (h *TrHTTP) Post(addr string, msg io.Reader) (io.ReadCloser, error) {
 	res, err := h.client.Post(addr, "application/octet-stream", msg)
@@ -79,7 +78,7 @@ func (h *TrHTTP) MulticastM(path int, peers []node.Node, mdata [][]byte, cb func
 
 func (h *TrHTTP) Start(o transport.TransportServer, addr string) {
 	h.Server = &http.Server{
-		Addr: addr,
+		Addr:    addr,
 		Handler: h,
 	}
 	h.O = o
@@ -90,7 +89,7 @@ func (h *TrHTTP) Stop() {
 	if h.Server == nil {
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10 * time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	h.Server.Shutdown(ctx)
 	h.Server.Close()
 }

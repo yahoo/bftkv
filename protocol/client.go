@@ -4,21 +4,21 @@
 package protocol
 
 import (
-	"encoding/binary"
-	"math"
 	"bytes"
 	gocrypto "crypto"
+	"encoding/binary"
 	"errors"
 	"log"
+	"math"
 
 	"github.com/yahoo/bftkv"
 	"github.com/yahoo/bftkv/crypto"
 	"github.com/yahoo/bftkv/crypto/auth"
 	"github.com/yahoo/bftkv/crypto/threshold"
 	"github.com/yahoo/bftkv/node"
+	"github.com/yahoo/bftkv/packet"
 	"github.com/yahoo/bftkv/quorum"
 	"github.com/yahoo/bftkv/transport"
-	"github.com/yahoo/bftkv/packet"
 )
 
 type Client struct {
@@ -51,17 +51,17 @@ func majorityError(errs []error, fallback error) error {
 
 func NewClient(self node.SelfNode, qs quorum.QuorumSystem, tr transport.Transport, crypt *crypto.Crypto) *Client {
 	return &Client{Protocol{
-		self: self,
-		qs: qs,
-		tr: tr,
-		crypt: crypt,
+		self:      self,
+		qs:        qs,
+		tr:        tr,
+		crypt:     crypt,
 		threshold: threshold.New(crypt),
 	}}
 }
 
 func (c *Client) Write(variable []byte, value []byte, proof *packet.SignaturePacket) error {
 	// collect timestamps from a quorum
-	qr := c.qs.ChooseQuorum(quorum.READ|quorum.AUTH)
+	qr := c.qs.ChooseQuorum(quorum.READ | quorum.AUTH)
 	maxt := uint64(0)
 	var actives, failure []node.Node
 	c.tr.Multicast(transport.Time, qr.Nodes(), variable, func(res *transport.MulticastResponse) bool {
@@ -84,7 +84,7 @@ func (c *Client) Write(variable []byte, value []byte, proof *packet.SignaturePac
 		return bftkv.ErrInvalidTimestamp
 	}
 
-	return c.writeWithTimestamp(variable, value, maxt + 1, proof)
+	return c.writeWithTimestamp(variable, value, maxt+1, proof)
 }
 
 func (c *Client) WriteOnce(variable []byte, value []byte, proof *packet.SignaturePacket) error {
@@ -150,7 +150,7 @@ func (c *Client) collectSignatures(variable []byte, value []byte, t uint64, proo
 				var s *packet.SignaturePacket
 				s, err = packet.ParseSignature(res.Data)
 				if err == nil {
-					return c.crypt.CollectiveSignature.Combine(ss, s, qa)	// whatever the response is
+					return c.crypt.CollectiveSignature.Combine(ss, s, qa) // whatever the response is
 				}
 			}
 		}
@@ -170,9 +170,9 @@ func (c *Client) collectSignatures(variable []byte, value []byte, t uint64, proo
 }
 
 type signedValue struct {
-	node node.Node
-	sig *packet.SignaturePacket
-	ss *packet.SignaturePacket
+	node   node.Node
+	sig    *packet.SignaturePacket
+	ss     *packet.SignaturePacket
 	packet []byte
 }
 
@@ -200,7 +200,7 @@ func (c *Client) maxTimestampedValue(m map[uint64]map[string][]*signedValue, q q
 		if isThreshold(l, q) {
 			return []byte(v), maxt, nil
 		}
- 	}
+	}
 	return nil, 0, errInProgress
 }
 
@@ -225,18 +225,18 @@ func (c *Client) processResponse(res *transport.MulticastResponse, m map[uint64]
 		vl = make(map[string][]*signedValue)
 		m[t] = vl
 	}
-	vl[string(val)] = append(vl[string(val)], &signedValue{res.Peer, sig, ss, res.Data})	// string([]byte) = ""
+	vl[string(val)] = append(vl[string(val)], &signedValue{res.Peer, sig, ss, res.Data}) // string([]byte) = ""
 	return nil
 }
 
 type readResult struct {
 	value []byte
-	err error
+	err   error
 }
 
 func (c *Client) Read(variable []byte, proof *packet.SignaturePacket) ([]byte, error) {
 	q := c.qs.ChooseQuorum(quorum.READ)
-	ch := make(chan(readResult))
+	ch := make(chan (readResult))
 	pkt, err := packet.Serialize(variable, nil, uint64(0), nil, proof)
 	if err != nil {
 		return nil, err
@@ -264,17 +264,17 @@ func (c *Client) Read(variable []byte, proof *packet.SignaturePacket) ([]byte, e
 					ch = nil
 				}
 			}
-			return false	// go through all members in the quorum
+			return false // go through all members in the quorum
 		})
 		if ch != nil {
 			ch <- readResult{nil, bftkv.ErrInsufficientNumberOfResponses}
 		}
 		c.revoke(m)
-		if value != nil && len(value) > 0 {	// @@ how can we distinguish nil (no variable) from an empty value?
+		if value != nil && len(value) > 0 { // @@ how can we distinguish nil (no variable) from an empty value?
 			c.writeBack(q.Nodes(), m, value, maxt)
 		}
 	}()
-	res := <- ch
+	res := <-ch
 	return res.value, res.err
 }
 
@@ -316,7 +316,7 @@ func (c *Client) revoke(m map[uint64]map[string][]*signedValue) {
 		for _, l := range vl {
 			for _, signedVal := range l {
 				nodes := c.crypt.CollectiveSignature.Signers(signedVal.ss)
-				prev_revoked:
+			prev_revoked:
 				for _, i := range nodes {
 					id := i.Id()
 					if v, exists := dup_map[id]; exists {
@@ -346,12 +346,11 @@ func (c *Client) revoke(m map[uint64]map[string][]*signedValue) {
 }
 
 func (c *Client) doRevoke(tbr node.Node, revoked []uint64, node_type string) []uint64 {
-	c.self.Revoke(tbr);
+	c.self.Revoke(tbr)
 	revoked = append(revoked, tbr.Id())
 	log.Printf("Revoked %s node: %s\n", node_type, tbr.Name())
 	return revoked
 }
-
 
 //
 // TPA
@@ -466,14 +465,13 @@ func (c *Client) setupAuthenticationParameters(variable []byte, cred []byte, q q
 		if res.Err == nil {
 			succ = append(succ, res.Peer)
 		}
-		return false	// broadcast as many as possible
+		return false // broadcast as many as possible
 	})
 	if !q.IsSufficient(succ) {
 		return bftkv.ErrInsufficientNumberOfValidResponses
 	}
 	return nil
 }
-
 
 //
 // distributed crypto
@@ -489,7 +487,7 @@ func (c *Client) Distribute(caname string, key interface{}) error {
 	mpkt := make([][]byte, len(secrets))
 	for i, secret := range secrets {
 		val := threshold.SerializeParams(algo, secret)
-		pkt, err := packet.Serialize([]byte(caname), val)		// do we need to sign?
+		pkt, err := packet.Serialize([]byte(caname), val) // do we need to sign?
 		if err != nil {
 			return err
 		}
@@ -527,7 +525,7 @@ func (c *Client) DistSign(caname string, tbs []byte, algo crypto.ThresholdAlgo, 
 		}
 		var sig []byte
 		succ := 0
-		c.tr.Multicast(transport.DistSign, nodes, pkt, func (res *transport.MulticastResponse) bool {
+		c.tr.Multicast(transport.DistSign, nodes, pkt, func(res *transport.MulticastResponse) bool {
 			if res.Err == nil && res.Data != nil {
 				succ++
 				sig, err = proc.ProcessResponse(res.Data, res.Peer)
@@ -541,7 +539,7 @@ func (c *Client) DistSign(caname string, tbs []byte, algo crypto.ThresholdAlgo, 
 		if sig != nil || err != nil {
 			return sig, err
 		}
-		if succ == 0 {	// no more new responses
+		if succ == 0 { // no more new responses
 			return nil, bftkv.ErrInsufficientNumberOfResponses
 		}
 	}
